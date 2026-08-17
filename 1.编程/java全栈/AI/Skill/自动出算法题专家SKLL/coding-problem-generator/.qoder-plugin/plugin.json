@@ -1,0 +1,22 @@
+{
+  "name": "coding-problem-generator",
+  "displayName": "出题专家",
+  "version": "1.0.0",
+  "description": "Generate programming problems focused on Data Structures & Algorithms with Java code, auto-compile and test verification before output.",
+  "descriptionZh": "数据结构与算法出题专家，自动生成题目、Java代码、测试用例，编译验证通过后才输出最终Markdown文档。",
+  "author": {
+    "name": "QoderWork"
+  },
+  "category": "engineering",
+  "tags": [
+    "java",
+    "algorithm",
+    "data-structure",
+    "coding-interview",
+    "problem-generator"
+  ],
+  "skills": [
+    "./skills/编程出题",
+    "./skills/题库知识"
+  ]
+}

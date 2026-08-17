@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>3D 柏林噪声地形 · Perlin Noise Terrain</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#0b1120;
+    font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif; }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+
+  #title {
+    position:fixed; top:14px; left:50%; transform:translateX(-50%);
+    color:#e8f0ff; font-size:15px; letter-spacing:3px; z-index:5;
+    text-shadow:0 2px 8px rgba(0,0,0,.6); pointer-events:none; opacity:.9;
+  }
+  #panel {
+    position:fixed; top:16px; left:16px; width:290px; z-index:10;
+    background:rgba(13,19,34,.85); backdrop-filter:blur(12px);
+    border:1px solid rgba(96,150,255,.28); border-radius:14px;
+    padding:16px 18px; color:#dbe6f7; font-size:13px;
+    box-shadow:0 8px 32px rgba(0,0,0,.45);
+    max-height:calc(100vh - 32px); overflow-y:auto;
+  }
+  #panel h2 { font-size:16px; margin-bottom:4px; color:#9ec6ff; }
+  #panel .hint { font-size:11px; color:#7f8ca3; margin-bottom:12px; }
+  .control { margin-bottom:10px; }
+  .control label { display:flex; justify-content:space-between; margin-bottom:3px; color:#aebfd9; }
+  .control label span { color:#6fb2ff; font-variant-numeric:tabular-nums; }
+  .control input[type=range] { width:100%; accent-color:#4da3ff; height:18px; cursor:pointer; }
+  .checks { display:flex; gap:14px; flex-wrap:wrap; margin:12px 0; }
+  .checks label { display:flex; align-items:center; gap:5px; cursor:pointer; color:#aebfd9; }
+  .checks input { accent-color:#4da3ff; cursor:pointer; }
+  #seedBtn {
+    width:100%; padding:9px; border:none; border-radius:8px; cursor:pointer;
+    background:linear-gradient(135deg,#3b82f6,#2563eb); color:#fff; font-size:13px;
+    transition:.2s; box-shadow:0 4px 14px rgba(59,130,246,.35);
+  }
+  #seedBtn:hover { transform:translateY(-1px); box-shadow:0 6px 18px rgba(59,130,246,.5); }
+  .footer { margin-top:10px; font-size:11px; color:#67748c; display:flex; justify-content:space-between; }
+  #fps { color:#7ee787; }
+
+  #loading,#error {
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:#0b1120; z-index:100; flex-direction:column; gap:14px;
+    color:#9ec6ff; font-size:14px;
+  }
+  #error { display:none; color:#ff9a9a; }
+  .spinner { width:36px; height:36px; border:3px solid rgba(110,178,255,.2);
+    border-top-color:#6eb2ff; border-radius:50%; animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  @media (max-width:640px){ #panel{ width:calc(100vw - 32px); } #title{ display:none; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="title">P E R L I N &nbsp; N O I S E &nbsp; 3 D</div>
+
+<div id="panel">
+  <h2>🏔️ 柏林噪声 3D 地形</h2>
+  <p class="hint">左键拖动旋转 · 滚轮缩放 · 右键平移</p>
+
+  <div class="control">
+    <label>噪声缩放 <span id="v-scale">45</span></label>
+    <input type="range" id="scale" min="10" max="100" step="1" value="45">
+  </div>
+  <div class="control">
+    <label>地形高度 <span id="v-amplitude">18</span></label>
+    <input type="range" id="amplitude" min="2" max="40" step="0.5" value="18">
+  </div>
+  <div class="control">
+    <label>细节层次 Octaves <span id="v-octaves">4</span></label>
+    <input type="range" id="octaves" min="1" max="8" step="1" value="4">
+  </div>
+  <div class="control">
+    <label>粗糙度 Persistence <span id="v-persistence">0.50</span></label>
+    <input type="range" id="persistence" min="0.1" max="0.9" step="0.05" value="0.5">
+  </div>
+  <div class="control">
+    <label>频率倍增 Lacunarity <span id="v-lacunarity">2.00</span></label>
+    <input type="range" id="lacunarity" min="1.2" max="3.5" step="0.1" value="2">
+  </div>
+  <div class="control">
+    <label>演化速度 <span id="v-speed">0.15</span></label>
+    <input type="range" id="speed" min="0" max="1" step="0.05" value="0.15">
+  </div>
+  <div class="control">
+    <label>海平面 <span id="v-waterLevel">0.42</span></label>
+    <input type="range" id="waterLevel" min="0" max="1" step="0.01" value="0.42">
+  </div>
+  <div class="control">
+    <label>网格精度 <span id="v-resolution">128</span></label>
+    <input type="range" id="resolution" min="32" max="256" step="16" value="128">
+  </div>
+
+  <div class="checks">
+    <label><input type="checkbox" id="animate" checked> 动态演化</label>
+    <label><input type="checkbox" id="wireframe"> 线框模式</label>
+    <label><input type="checkbox" id="showWater" checked> 显示水面</label>
+  </div>
+
+  <button id="seedBtn">🎲 随机种子（重新生成地形）</button>
+  <div class="footer"><span>算法: Perlin Noise + fBm</span><span>FPS: <b id="fps">--</b></span></div>
+</div>
+
+<div id="loading"><div class="spinner"></div><div>正在加载 Three.js ...</div></div>
+<div id="error">⚠️ Three.js 加载失败，请检查网络连接后刷新页面</div>
+
+<script>
+/* ================= 多 CDN 备用加载 Three.js ================= */
+function loadScript(urls) {
+  return new Promise((resolve, reject) => {
+    let i = 0;
+    const tryNext = () => {
+      if (i >= urls.length) return reject(new Error('加载失败'));
+      const s = document.createElement('script');
+      s.src = urls[i++];
+      s.onload = resolve;
+      s.onerror = tryNext;
+      document.head.appendChild(s);
+    };
+    tryNext();
+  });
+}
+
+(async () => {
+  try {
+    await loadScript([
+      'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+      'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js',
+      'https://unpkg.com/three@0.128.0/build/three.min.js'
+    ]);
+    await loadScript([
+      'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js',
+      'https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js'
+    ]);
+    document.getElementById('loading').style.display = 'none';
+    init();
+  } catch (e) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error').style.display = 'flex';
+  }
+})();
+
+/* ============================================================
+   经典柏林噪声（Perlin Noise）算法实现 —— 不依赖任何库
+   ============================================================ */
+class PerlinNoise {
+  constructor(seed = Math.floor(Math.random() * 1e9)) {
+    // 基于种子的伪随机数（Park-Miller LCG），保证同一种子生成同一地形
+    let s = seed % 2147483647;
+    if (s <= 0) s += 2147483646;
+    const random = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+
+    // ① 生成 0~255 的随机排列表（Fisher-Yates 洗牌）
+    const perm = Array.from({ length: 256 }, (_, i) => i);
+    for (let i = 255; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [perm[i], perm[j]] = [perm[j], perm[i]];
+    }
+    // ② 翻倍到 512，避免哈希时越界
+    this.p = new Uint8Array(512);
+    for (let i = 0; i < 512; i++) this.p[i] = perm[i & 255];
+  }
+
+  // ③ 缓和曲线 6t⁵-15t⁴+10t³：使格点处一阶导数连续，过渡平滑
+  fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+  lerp(t, a, b) { return a + t * (b - a); }
+
+  // ④ 梯度函数：根据哈希值选择伪随机梯度方向并求点积
+  grad(hash, x, y, z) {
+    const h = hash & 15;
+    const u = h < 8 ? x : y;
+    const v = h < 4 ? y : (h === 12 || h === 14 ? x : z);
+    return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+  }
+
+  // ⑤ 三维柏林噪声：对单位立方体 8 个角点的梯度贡献做三线性插值
+  noise(x, y, z) {
+    const p = this.p;
+    const X = Math.floor(x) & 255, Y = Math.floor(y) & 255, Z = Math.floor(z) & 255;
+    x -= Math.floor(x); y -= Math.floor(y); z -= Math.floor(z);
+    const u = this.fade(x), v = this.fade(y), w = this.fade(z);
+    const A = p[X] + Y,   AA = p[A] + Z,   AB = p[A + 1] + Z;
+    const B = p[X+1] + Y, BA = p[B] + Z,   BB = p[B + 1] + Z;
+
+    return this.lerp(w,
+      this.lerp(v,
+        this.lerp(u, this.grad(p[AA],   x,   y,   z),
+                     this.grad(p[BA],   x-1, y,   z)),
+        this.lerp(u, this.grad(p[AB],   x,   y-1, z),
+                     this.grad(p[BB],   x-1, y-1, z))),
+      this.lerp(v,
+        this.lerp(u, this.grad(p[AA+1], x,   y,   z-1),
+                     this.grad(p[BA+1], x-1, y,   z-1)),
+        this.lerp(u, this.grad(p[AB+1], x,   y-1, z-1),
+                     this.grad(p[BB+1], x-1, y-1, z-1))));
+  }
+
+  // ⑥ 分形布朗运动（fBm）：多个频率/振幅的噪声叠加，产生丰富细节
+  fbm(x, y, z, octaves, persistence, lacunarity) {
+    let total = 0, amplitude = 1, frequency = 1, maxValue = 0;
+    for (let i = 0; i < octaves; i++) {
+      total += this.noise(x * frequency, y * frequency, z * frequency) * amplitude;
+      maxValue += amplitude;
+      amplitude *= persistence;   // 振幅逐层衰减
+      frequency *= lacunarity;    // 频率逐层增加
+    }
+    return total / maxValue;      // 归一化到约 [-1, 1]
+  }
+}
+
+/* ============================================================
+   Three.js 3D 场景
+   ============================================================ */
+function init() {
+  const params = {
+    scale: 45, amplitude: 18, octaves: 4,
+    persistence: 0.5, lacunarity: 2.0,
+    speed: 0.15, waterLevel: 0.42,
+    animate: true, wireframe: false, showWater: true
+  };
+  let perlin = new PerlinNoise();
+  let resolution = 128, terrain = null, baseXY = null, noiseTime = Math.random() * 100;
+
+  /* ---------- 场景 / 相机 / 渲染器 ---------- */
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0b1120);
+  scene.fog = new THREE.Fog(0x0b1120, 260, 780);
+
+  const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 2000);
+  camera.position.set(125, 95, 125);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  document.getElementById('app').appendChild(renderer.domElement);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.maxPolarAngle = Math.PI * 0.495;
+  controls.minDistance = 30;
+  controls.maxDistance = 600;
+
+  /* ---------- 灯光 ---------- */
+  scene.add(new THREE.AmbientLight(0x8899bb, 0.75));
+  const sun = new THREE.DirectionalLight(0xfff0d8, 1.5);
+  sun.position.set(120, 180, 90);
+  scene.add(sun);
+  const fill = new THREE.DirectionalLight(0x5f7fc0, 0.35);
+  fill.position.set(-100, 60, -120);
+  scene.add(fill);
+
+  /* ---------- 地形网格 ---------- */
+  const SIZE = 220;
+  const terrainMat = new THREE.MeshStandardMaterial({
+    vertexColors: true, roughness: 0.95, metalness: 0.02
+  });
+
+  function buildTerrain() {
+    if (terrain) { scene.remove(terrain); terrain.geometry.dispose(); }
+    const geo = new THREE.PlaneGeometry(SIZE, SIZE, resolution, resolution);
+    const count = geo.attributes.position.count;
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+    terrain = new THREE.Mesh(geo, terrainMat);
+    terrain.rotation.x = -Math.PI / 2;   // 放平，局部 Z 轴即世界高度方向
+    scene.add(terrain);
+    // 缓存顶点平面坐标，避免每帧重复读取
+    const pos = geo.attributes.position;
+    baseXY = new Float32Array(count * 2);
+    for (let i = 0; i < count; i++) {
+      baseXY[i * 2] = pos.getX(i);
+      baseXY[i * 2 + 1] = pos.getY(i);
+    }
+  }
+
+  /* ---------- 水面 ---------- */
+  const water = new THREE.Mesh(
+    new THREE.PlaneGeometry(SIZE * 4, SIZE * 4),
+    new THREE.MeshStandardMaterial({
+      color: 0x1b5e8a, transparent: true, opacity: 0.62,
+      roughness: 0.2, metalness: 0.55
+    })
+  );
+  water.rotation.x = -Math.PI / 2;
+  scene.add(water);
+  const waterY = () => (params.waterLevel * 2 - 1) * params.amplitude;
+
+  /* ---------- 高度配色（深海→浅滩→沙滩→草地→森林→岩石→积雪） ---------- */
+  const STOPS = [
+    [0.00, 0.05, 0.16, 0.33],
+    [0.36, 0.13, 0.40, 0.60],
+    [0.43, 0.80, 0.74, 0.54],
+    [0.50, 0.26, 0.52, 0.27],
+    [0.66, 0.15, 0.37, 0.20],
+    [0.80, 0.47, 0.44, 0.42],
+    [0.90, 0.93, 0.94, 0.98],
+    [1.00, 1.00, 1.00, 1.00]
+  ];
+  function applyColor(attr, i, h) {
+    h = h < 0 ? 0 : h > 1 ? 1 : h;
+    let k = 0;
+    while (k < STOPS.length - 2 && h > STOPS[k + 1][0]) k++;
+    const a = STOPS[k], b = STOPS[k + 1];
+    const f = (h - a[0]) / (b[0] - a[0] || 1);
+    attr.setXYZ(i, a[1] + (b[1] - a[1]) * f,
+                   a[2] + (b[2] - a[2]) * f,
+                   a[3] + (b[3] - a[3]) * f);
+  }
+
+  /* ---------- 核心：用柏林噪声更新地形 ---------- */
+  function updateTerrain() {
+    const pos = terrain.geometry.attributes.position;
+    const col = terrain.geometry.attributes.color;
+    const { scale, amplitude, octaves, persistence, lacunarity } = params;
+    const inv = 1 / scale;
+    for (let i = 0; i < pos.count; i++) {
+      // 第 3 个维度作为时间 → 地形随时间平滑演化
+      const n = perlin.fbm(baseXY[i * 2] * inv, baseXY[i * 2 + 1] * inv,
+                           noiseTime, octaves, persistence, lacunarity);
+      pos.setZ(i, n * amplitude);
+      applyColor(col, i, (n + 1) * 0.5);
+    }
+    pos.needsUpdate = true;
+    col.needsUpdate = true;
+    if (!terrainMat.wireframe) terrain.geometry.computeVertexNormals();
+  }
+
+  /* ---------- UI 绑定 ---------- */
+  function bindRange(id, key, fmt, onChange) {
+    const el = document.getElementById(id);
+    const out = document.getElementById('v-' + id);
+    el.addEventListener('input', () => {
+      const v = parseFloat(el.value);
+      params[key] = v;
+      out.textContent = fmt ? fmt(v) : v;
+      if (onChange) onChange(v);
+      if (!params.animate) updateTerrain();
+    });
+  }
+  const f2 = v => v.toFixed(2);
+  bindRange('scale', 'scale');
+  bindRange('amplitude', 'amplitude');
+  bindRange('octaves', 'octaves');
+  bindRange('persistence', 'persistence', f2);
+  bindRange('lacunarity', 'lacunarity', f2);
+  bindRange('speed', 'speed', f2);
+  bindRange('waterLevel', 'waterLevel', f2);
+  bindRange('resolution', null, null, v => { resolution = v; buildTerrain(); updateTerrain(); });
+
+  document.getElementById('animate').addEventListener('change', e => params.animate = e.target.checked);
+  document.getElementById('wireframe').addEventListener('change', e => {
+    params.wireframe = e.target.checked;
+    terrainMat.wireframe = params.wireframe;
+    if (!params.animate) updateTerrain();
+  });
+  document.getElementById('showWater').addEventListener('change', e => water.visible = e.target.checked);
+  document.getElementById('seedBtn').addEventListener('click', () => {
+    perlin = new PerlinNoise();
+    updateTerrain();
+  });
+
+  /* ---------- 主循环 ---------- */
+  const clock = new THREE.Clock();
+  const fpsEl = document.getElementById('fps');
+  let frames = 0, acc = 0;
+
+  function loop() {
+    requestAnimationFrame(loop);
+    const dt = Math.min(clock.getDelta(), 0.1);
+    controls.update();
+    if (params.animate) {
+      noiseTime += dt * params.speed;
+      updateTerrain();
+    }
+    water.position.y = waterY() + Math.sin(clock.elapsedTime * 0.9) * 0.25;
+    renderer.render(scene, camera);
+    frames++; acc += dt;
+    if (acc >= 0.5) { fpsEl.textContent = Math.round(frames / acc); frames = 0; acc = 0; }
+  }
+
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  buildTerrain();
+  updateTerrain();
+  loop();
+}
+</script>
+</body>
+</html>

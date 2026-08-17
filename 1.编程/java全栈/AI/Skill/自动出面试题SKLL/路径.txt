@@ -1,0 +1,9 @@
+C:\Users\Administrator\.workbuddy\plugins\marketplaces\my-experts\plugins\java-backend-interview
+
+你想做什么	怎么做
+看 Agent 规则和模块	读 agents/java-backend-interview.md（上面已展示）
+看知识库里的考点	读 references/knowledge-base.md（上面已展示）
+修改定时任务	跟我说"修改定时任务..."，我来改
+直接出题对话	在 WorkBuddy 中输入 出题：中级后端，5道MySQL
+看定时任务已生成的题库	进目录 D:\文件\题目\ 查看 JSON 文件
+重新打包导出	跟我说"重新打包专家包"

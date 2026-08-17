@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DLA 扩散限制聚集 · 3D 可视化</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#141c28; --panel2:#182234; --line:#26354b;
+  --txt:#d7e1ee; --dim:#8aa0b8; --accent:#2dd4bf; --accent2:#38bdf8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--txt);font-size:13px}
+#app{display:flex;height:100vh}
+/* ---------- 左侧控制台 ---------- */
+#panel{width:335px;min-width:335px;height:100%;overflow-y:auto;background:var(--panel);border-right:1px solid var(--line);padding:12px}
+#panel::-webkit-scrollbar{width:8px}
+#panel::-webkit-scrollbar-thumb{background:#2b3a52;border-radius:4px}
+h1{font-size:16px;font-weight:600;padding:4px 2px 2px;color:#fff}
+.subtitle{font-size:11px;color:var(--dim);padding:0 2px 10px}
+.section{border:1px solid var(--line);border-radius:10px;background:var(--panel2);margin-bottom:12px;overflow:hidden}
+.section>h2{font-size:12px;letter-spacing:1px;color:var(--accent2);padding:8px 12px;background:rgba(56,189,248,.08);border-bottom:1px solid var(--line)}
+.ctrl{padding:7px 12px}
+.ctrl-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px}
+.ctrl-label .val{color:var(--accent);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;height:18px;accent-color:var(--accent);cursor:pointer}
+input[type=number],select{width:100%;background:#0f1622;border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:5px 8px;font-size:12px;outline:none}
+input[type=number]:focus,select:focus{border-color:var(--accent)}
+input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;vertical-align:-2px;margin-right:6px}
+.check-row{padding:7px 12px;font-size:12px;cursor:pointer;display:block}
+.seed-row{display:flex;gap:6px;padding:7px 12px}
+.seed-row input{flex:1}
+.icon-btn{width:34px;background:#0f1622;border:1px solid var(--line);border-radius:6px;color:var(--txt);cursor:pointer;font-size:14px}
+.icon-btn:hover{border-color:var(--accent)}
+.btns{display:flex;gap:8px;padding:10px 12px 12px}
+button.act{flex:1;border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;color:#04121a;background:linear-gradient(135deg,#2dd4bf,#38bdf8)}
+button.act:hover{filter:brightness(1.12)}
+button.act:disabled{opacity:.45;cursor:not-allowed}
+button.ghost{flex:1;background:#0f1622;color:var(--txt);border:1px solid var(--line)}
+button.ghost:hover{border-color:var(--accent)}
+#progressWrap{height:8px;background:#0f1622;border-radius:4px;overflow:hidden;border:1px solid var(--line);margin:0 12px}
+#progressFill{height:100%;width:0;background:linear-gradient(90deg,#2dd4bf,#38bdf8);transition:width .15s}
+#status{font-size:11px;color:var(--dim);padding:6px 12px 10px;min-height:26px;line-height:1.5}
+.note{font-size:11px;color:var(--dim);line-height:1.6;padding:8px 12px}
+/* ---------- 右侧 3D 展示 ---------- */
+#viewport{flex:1;position:relative}
+#viewport canvas{display:block}
+.overlay{position:absolute;background:rgba(10,16,26,.72);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12px;backdrop-filter:blur(4px);pointer-events:none;z-index:5}
+#stats{right:12px;bottom:12px;line-height:1.7}
+#stats b{color:var(--accent);font-weight:600}
+#hint{left:12px;bottom:12px;color:var(--dim)}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- 左侧控制台 -->
+  <div id="panel">
+    <h1>❄️ DLA 分形聚集 · 3D</h1>
+    <div class="subtitle">Diffusion-Limited Aggregation Visualizer</div>
+
+    <div class="section"><h2>🌱 生长参数</h2>
+      <div id="grp-growth"></div>
+      <div class="note">「目标粒子数 / 种子形状」修改后需点击「重置」生效，其余参数实时生效。</div>
+    </div>
+
+    <div class="section"><h2>🎨 显示设置</h2>
+      <div id="grp-display"></div>
+    </div>
+
+    <div class="section"><h2>🚀 操作</h2>
+      <div class="btns">
+        <button class="act" id="btn-toggle">⏸ 暂停</button>
+        <button class="ghost" id="btn-reset">⟲ 重置</button>
+      </div>
+      <div id="progressWrap"><div id="progressFill"></div></div>
+      <div id="status">就绪</div>
+    </div>
+
+    <div class="note">
+      <b style="color:#8aa0b8">算法说明：</b>粒子从「生成球面」上随机释放，做布朗随机游走；
+      当它与聚集簇相邻时按「粘附概率」固定下来，漂出「杀死半径」则重新释放。
+      远离簇时采用自适应大步长加速（不影响物理结果）。
+      最终形成分形维数 ≈ 2.5 的枝状珊瑚结构。
+    </div>
+  </div>
+
+  <!-- 右侧展示界面 -->
+  <div id="viewport">
+    <div class="overlay" id="hint">🖱 左键旋转 · 滚轮缩放 · 右键平移</div>
+    <div class="overlay" id="stats"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+/* ============================================================
+ * 1. 工具：确定性随机数
+ * ============================================================ */
+function mulberry32(a){
+  return function(){
+    a|=0; a=a+0x6D2B79F5|0;
+    let t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+const clamp=(x,a,b)=>x<a?a:(x>b?b:x);
+const lerp=(a,b,t)=>a+(b-a)*t;
+function lerp3(c0,c1,c2,t){ // 两段颜色渐变
+  if(t<0.5){ const k=t*2; return [lerp(c0[0],c1[0],k),lerp(c0[1],c1[1],k),lerp(c0[2],c1[2],k)]; }
+  const k=(t-0.5)*2; return [lerp(c1[0],c2[0],k),lerp(c1[1],c2[1],k),lerp(c1[2],c2[2],k)];
+}
+
+/* ============================================================
+ * 2. 参数与控制台 UI
+ * ============================================================ */
+const params={ seed:20240521, seedMode:'point', colorMode:'order',
+  showSpawn:false, showGrid:false, autorotate:false };
+
+const CFG={
+  growth:[
+    {k:'target',       label:'目标粒子数',  min:2000, max:120000, step:1000, v:20000, dec:0},
+    {k:'stickiness',   label:'粘附概率',    min:0.05, max:1,   step:0.05, v:1,    dec:2},
+    {k:'stepSize',     label:'游走步长',    min:0.2,  max:2,   step:0.1,  v:1,    dec:1},
+    {k:'walkers',      label:'并行游走数',  min:10,   max:500, step:10,   v:200,  dec:0},
+    {k:'stepsPerFrame',label:'每帧步数',    min:1,    max:60,  step:1,    v:12,   dec:0},
+    {k:'spawnMargin',  label:'生成半径余量',min:2,    max:25,  step:1,    v:8,    dec:0},
+    {k:'killFactor',   label:'杀死半径系数',min:1.5,  max:5,   step:0.1,  v:2.5,  dec:1},
+    {k:'centerBias',   label:'中心吸引',    min:0,    max:0.1, step:0.005,v:0.02, dec:3},
+  ],
+  display:[
+    {k:'pointSize',    label:'粒子大小',    min:0.5,  max:8,   step:0.1,  v:2.4,  dec:1},
+  ]
+};
+
+function sliderRow(c, onChange){
+  params[c.k]=c.v;
+  const wrap=document.createElement('div'); wrap.className='ctrl';
+  const lab=document.createElement('div'); lab.className='ctrl-label';
+  const val=document.createElement('span'); val.className='val';
+  val.textContent=c.v.toFixed(c.dec);
+  lab.innerHTML=`<span>${c.label}</span>`; lab.appendChild(val);
+  const inp=document.createElement('input');
+  inp.type='range'; inp.min=c.min; inp.max=c.max; inp.step=c.step; inp.value=c.v;
+  inp.oninput=()=>{ params[c.k]=parseFloat(inp.value); val.textContent=params[c.k].toFixed(c.dec); onChange&&onChange(); };
+  wrap.appendChild(lab); wrap.appendChild(inp);
+  return wrap;
+}
+function checkRow(label,key,onChange){
+  const l=document.createElement('label'); l.className='check-row';
+  const c=document.createElement('input'); c.type='checkbox'; c.checked=params[key];
+  c.onchange=()=>{ params[key]=c.checked; onChange&&onChange(); };
+  l.appendChild(c); l.appendChild(document.createTextNode(label));
+  return l;
+}
+function selectRow(label,key,options,onChange){
+  const wrap=document.createElement('div'); wrap.className='ctrl';
+  wrap.innerHTML=`<div class="ctrl-label"><span>${label}</span></div>`;
+  const sel=document.createElement('select');
+  options.forEach(([v,t])=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; sel.appendChild(o); });
+  sel.value=params[key];
+  sel.onchange=()=>{ params[key]=sel.value; onChange&&onChange(); };
+  wrap.appendChild(sel);
+  return wrap;
+}
+function buildUI(){
+  const gG=document.getElementById('grp-growth');
+  // 随机种子
+  const sr=document.createElement('div'); sr.className='seed-row';
+  const seedInp=document.createElement('input'); seedInp.type='number'; seedInp.value=params.seed;
+  seedInp.onchange=()=>params.seed=parseInt(seedInp.value)||0;
+  const dice=document.createElement('button'); dice.className='icon-btn'; dice.textContent='🎲'; dice.title='随机种子';
+  dice.onclick=()=>{ params.seed=(Math.random()*1e6)|0; seedInp.value=params.seed; };
+  sr.appendChild(seedInp); sr.appendChild(dice); gG.appendChild(sr);
+  gG.appendChild(selectRow('种子形状','seedMode',
+    [['point','中心单点'],['ball','中心球体'],['disc','底部圆盘'],['line','竖直线段']]));
+  CFG.growth.forEach(c=>gG.appendChild(sliderRow(c)));
+
+  const gD=document.getElementById('grp-display');
+  gD.appendChild(selectRow('颜色模式','colorMode',
+    [['order','附着顺序'],['radius','距中心半径'],['height','高度']],()=>{ dirty=true; }));
+  CFG.display.forEach(c=>gD.appendChild(sliderRow(c,()=>{ pointsMat.size=params.pointSize; })));
+  gD.appendChild(checkRow('显示生成球面','showSpawn',()=>{ spawnSphere.visible=params.showSpawn; }));
+  gD.appendChild(checkRow('显示参考网格','showGrid',()=>{ grid.visible=params.showGrid; }));
+  gD.appendChild(checkRow('自动旋转','autorotate',()=>{ controls.autoRotate=params.autorotate; }));
+}
+
+/* ============================================================
+ * 3. DLA 核心
+ * ============================================================ */
+const CELL=1.0, K_OFF=2048, K_N=4096;   // 空间哈希参数（粘附距离=1）
+let rng=null;
+let cluster=null, clusterCount=0, capacity=0, maxR=0;
+let hash=null;
+let walkers=[];
+let running=false, finished=false, dirty=false;
+let totalSteps=0, elapsed=0, lastTick=0;
+
+const cellKey=(ix,iy,iz)=>((ix+K_OFF)*K_N+(iy+K_OFF))*K_N+(iz+K_OFF);
+
+function addParticle(x,y,z){
+  if(clusterCount>=capacity) return false;
+  const i=clusterCount++;
+  cluster[3*i]=x; cluster[3*i+1]=y; cluster[3*i+2]=z;
+  const r=Math.sqrt(x*x+y*y+z*z);
+  if(r>maxR) maxR=r;
+  const k=cellKey(Math.floor(x/CELL),Math.floor(y/CELL),Math.floor(z/CELL));
+  let b=hash.get(k);
+  if(!b){ b=[]; hash.set(k,b); }
+  b.push(i);
+  return true;
+}
+function makeSeed(){
+  const m=params.seedMode;
+  if(m==='point'){ addParticle(0,0,0); }
+  else if(m==='ball'){
+    const R=3;
+    for(let x=-R;x<=R;x++)for(let y=-R;y<=R;y++)for(let z=-R;z<=R;z++)
+      if(x*x+y*y+z*z<=R*R+0.5) addParticle(x,y,z);
+  }
+  else if(m==='disc'){
+    const R=12;
+    for(let x=-R;x<=R;x++)for(let z=-R;z<=R;z++)
+      if(x*x+z*z<=R*R) addParticle(x,0,z);
+  }
+  else if(m==='line'){
+    for(let y=-8;y<=8;y++) addParticle(0,y,0);
+  }
+}
+function spawnWalker(w){
+  // 在半径 spawnR 的球面上均匀取点
+  const spawnR=maxR+params.spawnMargin;
+  let x,y,z,l;
+  do{ x=rng()*2-1; y=rng()*2-1; z=rng()*2-1; l=x*x+y*y+z*z; }while(l>1||l<1e-8);
+  l=Math.sqrt(l);
+  w.x=x/l*spawnR; w.y=y/l*spawnR; w.z=z/l*spawnR;
+}
+function tryStick(x,y,z){
+  // 检查 27 个相邻哈希格内是否有簇粒子（距离 ≤ 1）
+  const cx=Math.floor(x/CELL), cy=Math.floor(y/CELL), cz=Math.floor(z/CELL);
+  for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){
+    const b=hash.get(cellKey(cx+dx,cy+dy,cz+dz));
+    if(!b) continue;
+    for(let j=0;j<b.length;j++){
+      const i=b[j];
+      const ddx=cluster[3*i]-x, ddy=cluster[3*i+1]-y, ddz=cluster[3*i+2]-z;
+      if(ddx*ddx+ddy*ddy+ddz*ddz<=1.0) return true;
+    }
+  }
+  return false;
+}
+function stepWalker(w){
+  totalSteps++;
+  const d=Math.sqrt(w.x*w.x+w.y*w.y+w.z*w.z);
+  const killR=(maxR+params.spawnMargin)*params.killFactor;
+  if(d>killR){ spawnWalker(w); return; }
+  // 自适应步长：远离簇表面时大步跳跃（不会越过簇，物理等价）
+  let step=params.stepSize;
+  const free=d-maxR-2;
+  if(free>step) step=Math.min(free,25);
+  // 随机单位方向
+  const a=rng()*6.283185307, z0=rng()*2-1, s0=Math.sqrt(1-z0*z0);
+  let vx=s0*Math.cos(a), vy=s0*Math.sin(a), vz=z0;
+  // 微弱的朝向中心的漂移（加速收敛，可选）
+  if(params.centerBias>0 && d>1e-6){
+    const b=params.centerBias;
+    vx-=b*w.x/d; vy-=b*w.y/d; vz-=b*w.z/d;
+  }
+  w.x+=vx*step; w.y+=vy*step; w.z+=vz*step;
+  // 只有进入簇邻域才做哈希检测
+  const d2=w.x*w.x+w.y*w.y+w.z*w.z, lim=maxR+1.6;
+  if(d2<=lim*lim && tryStick(w.x,w.y,w.z)){
+    if(rng()<params.stickiness){
+      addParticle(w.x,w.y,w.z);
+      spawnWalker(w);
+    }
+    // 未粘附：继续游走（下一步可能弹离）
+  }
+}
+function advance(){
+  const steps=params.stepsPerFrame|0;
+  // 同步游走者数量（支持实时调整）
+  while(walkers.length<params.walkers){ const w={x:0,y:0,z:0}; spawnWalker(w); walkers.push(w); }
+  if(walkers.length>params.walkers) walkers.length=params.walkers;
+  for(let s=0;s<steps;s++){
+    for(let i=0;i<walkers.length;i++){
+      stepWalker(walkers[i]);
+      if(clusterCount>=params.target){ finish(); return; }
+    }
+  }
+  dirty=true;
+}
+function resetSim(){
+  rng=mulberry32(params.seed>>>0);
+  capacity=(params.target|0)+4096;
+  cluster=new Float32Array(capacity*3);
+  hash=new Map();
+  clusterCount=0; maxR=0; totalSteps=0; elapsed=0;
+  makeSeed();
+  walkers=[];
+  for(let i=0;i<params.walkers;i++){ const w={x:0,y:0,z:0}; spawnWalker(w); walkers.push(w); }
+  finished=false;
+  ensurePointCapacity();
+  dirty=true;
+  setStatus('🌱 种子已就绪，生长中…');
+  lastTick=performance.now();
+}
+function finish(){
+  running=false; finished=true; dirty=true;
+  const btn=document.getElementById('btn-toggle');
+  btn.textContent='✔ 已完成'; btn.disabled=true;
+  setStatus(`✅ 生长完成：${clusterCount.toLocaleString()} 粒子，簇半径 ${maxR.toFixed(1)}，用时 ${elapsed.toFixed(1)} s`);
+}
+
+/* ============================================================
+ * 4. Three.js 场景
+ * ============================================================ */
+let renderer,scene,camera,controls,points,pointsGeo,pointsMat,spawnSphere,grid;
+function makeSprite(){
+  const c=document.createElement('canvas'); c.width=c.height=64;
+  const g=c.getContext('2d');
+  const grad=g.createRadialGradient(24,22,4,32,32,30);
+  grad.addColorStop(0,'rgba(255,255,255,1)');
+  grad.addColorStop(0.65,'rgba(235,235,235,1)');
+  grad.addColorStop(1,'rgba(210,210,210,0)');
+  g.fillStyle=grad; g.beginPath(); g.arc(32,32,30,0,6.3); g.fill();
+  return new THREE.CanvasTexture(c);
+}
+function ensurePointCapacity(){
+  // 按当前容量重建点云缓冲
+  if(points){ scene.remove(points); pointsGeo.dispose(); }
+  pointsGeo=new THREE.BufferGeometry();
+  pointsGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(capacity*3),3));
+  pointsGeo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(capacity*3),3));
+  pointsGeo.setDrawRange(0,0);
+  if(!pointsMat){
+    pointsMat=new THREE.PointsMaterial({
+      size:params.pointSize, map:makeSprite(), vertexColors:true,
+      alphaTest:0.35, depthWrite:true, sizeAttenuation:true
+    });
+  }
+  points=new THREE.Points(pointsGeo,pointsMat);
+  points.frustumCulled=false;
+  scene.add(points);
+}
+function updatePoints(){
+  const pos=pointsGeo.attributes.position.array;
+  pos.set(cluster.subarray(0,clusterCount*3));
+  pointsGeo.attributes.position.needsUpdate=true;
+  pointsGeo.setDrawRange(0,clusterCount);
+  // 颜色（每帧按当前模式重算，保证半径/高度模式随生长一致）
+  const col=pointsGeo.attributes.color.array;
+  const m=params.colorMode, inv=maxR>1e-6?1/maxR:1, target=Math.max(1,params.target-1);
+  for(let i=0;i<clusterCount;i++){
+    const x=cluster[3*i], y=cluster[3*i+1], z=cluster[3*i+2];
+    let c;
+    if(m==='order'){ c=lerp3([34,211,238],[167,139,250],[251,146,60], i/target); }
+    else if(m==='radius'){
+      const t=clamp(Math.sqrt(x*x+y*y+z*z)*inv,0,1);
+      c=lerp3([96,165,250],[250,204,21],[239,68,68],t);
+    } else {
+      const t=clamp((y*inv+1)/2,0,1);
+      c=lerp3([45,90,160],[52,180,140],[240,245,250],t);
+    }
+    col[3*i]=c[0]/255; col[3*i+1]=c[1]/255; col[3*i+2]=c[2]/255;
+  }
+  pointsGeo.attributes.color.needsUpdate=true;
+  spawnSphere.scale.setScalar(Math.max(1,maxR+params.spawnMargin));
+}
+function initThree(){
+  const vp=document.getElementById('viewport');
+  renderer=new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(vp.clientWidth,vp.clientHeight);
+  vp.appendChild(renderer.domElement);
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x0b1020);
+  scene.fog=new THREE.Fog(0x0b1020,260,700);
+  camera=new THREE.PerspectiveCamera(50,vp.clientWidth/vp.clientHeight,0.1,3000);
+  camera.position.set(120,95,120);
+  controls=new THREE.OrbitControls(camera,renderer.domElement);
+  controls.target.set(0,10,0);
+  controls.enableDamping=true; controls.dampingFactor=0.08;
+  controls.minDistance=10; controls.maxDistance=800;
+  controls.autoRotateSpeed=1.2;
+  spawnSphere=new THREE.Mesh(
+    new THREE.SphereGeometry(1,28,18),
+    new THREE.MeshBasicMaterial({wireframe:true,color:0x38bdf8,transparent:true,opacity:0.12})
+  );
+  spawnSphere.visible=false; scene.add(spawnSphere);
+  grid=new THREE.GridHelper(400,40,0x24405e,0x16233a);
+  grid.visible=false; scene.add(grid);
+  window.addEventListener('resize',()=>{
+    camera.aspect=vp.clientWidth/vp.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(vp.clientWidth,vp.clientHeight);
+  });
+  (function loop(){
+    requestAnimationFrame(loop);
+    if(running && !finished){
+      advance();
+      elapsed+=(performance.now()-lastTick)/1000;
+    }
+    lastTick=performance.now();
+    if(dirty){ updatePoints(); dirty=false; refreshHUD(); }
+    controls.update();
+    renderer.render(scene,camera);
+  })();
+}
+
+/* ============================================================
+ * 5. HUD / 状态
+ * ============================================================ */
+const progressFill=document.getElementById('progressFill');
+const statusEl=document.getElementById('status');
+const statsEl=document.getElementById('stats');
+function setStatus(t){ statusEl.textContent=t; }
+function fmtSteps(n){ return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(0)+'K':n; }
+function refreshHUD(){
+  const pct=Math.round(clusterCount/params.target*100);
+  progressFill.style.width=pct+'%';
+  const state=finished?'已完成':(running?'生长中':'已暂停');
+  if(running&&!finished)
+    setStatus(`❄️ 生长中… ${clusterCount.toLocaleString()} / ${params.target.toLocaleString()} (${pct}%)`);
+  statsEl.innerHTML=
+    `已附着 <b>${clusterCount.toLocaleString()}</b> / ${params.target.toLocaleString()} · 簇半径 <b>${maxR.toFixed(1)}</b><br>`+
+    `总步数 <b>${fmtSteps(totalSteps)}</b> · 用时 <b>${elapsed.toFixed(1)} s</b> · 状态 <b>${state}</b>`;
+}
+
+/* ============================================================
+ * 6. 启动
+ * ============================================================ */
+buildUI();
+initThree();
+document.getElementById('btn-toggle').onclick=function(){
+  if(finished) return;
+  running=!running;
+  this.textContent=running?'⏸ 暂停':'▶ 继续';
+  setStatus(running?'❄️ 继续生长…':'⏸ 已暂停（参数可实时调整）');
+  refreshHUD();
+};
+document.getElementById('btn-reset').onclick=function(){
+  running=true; finished=false;
+  const btn=document.getElementById('btn-toggle');
+  btn.textContent='⏸ 暂停'; btn.disabled=false;
+  resetSim(); refreshHUD();
+};
+resetSim(); running=true; refreshHUD();
+</script>
+</body>
+</html>

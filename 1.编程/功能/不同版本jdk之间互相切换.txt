@@ -1,0 +1,18 @@
+当前环境下修改 
+新建 变量
+JAVA8=D:\Java\jdk1.8.0_391
+JAVA17=D:\Java\jdk-17.0.12
+临时切换
+set JAVA_HOME=%JAVA8%
+set PATH=%JAVA_HOME%\bin;%PATH%
+java -version
+
+永久修改  /M  
+
+在trae中  
+
+打开命令面板：Ctrl + Shift + P
+输入命令：Java: Configure Java Runtime 回车
+弹出 JDK 管理面板：
+Add Java Runtime：添加本地所有 JDK 路径（一次性导入 8/11/17/21）
+列表会展示全部已注册 JDK，点击任意版本即可全局切换

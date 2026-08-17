@@ -1,0 +1,6 @@
+文件/目录	作用
+.codebuddy-plugin/plugin.json	专家配置（名称/描述/标签/快捷指令）
+agents/java-backend-interview.md	核心 — Agent 的出题 Prompt、70+ 模块范围、题型规则、六维评分格式
+references/knowledge-base.md	知识库索引（38 本 PDF 面经资料的考点整理）
+avatars/expert.png	专家头像
+README.md	说明文档

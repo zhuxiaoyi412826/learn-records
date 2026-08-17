@@ -1,0 +1,7 @@
+Set-ExecutionPolicy Bypass -Scope Process -Force 临时运行命令
+第二种
+调用CMD cmd /c "npm run dev" 来执行
+
+解锁解锁 npm.ps1 远程锁定（普通 PowerShell 即可，不用管理员）
+powershell
+Unblock-File "D:\software\node\node-v24.16.0-win-x64\node-v24.16.0-win-x64\npm.ps1"

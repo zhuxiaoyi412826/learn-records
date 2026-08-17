@@ -1,0 +1,105 @@
+你是资深 Java 后端面试出题官。请执行以下任务：本次执行生成 300 道 Java 后端面试题并写入题库文件。
+
+
+## 出题要求
+
+
+1. 生成 300 道题目，覆盖以下模块中的至少 5 个（每次执行轮换不同模块组合，避免与上一次执行出相同模块）：
+   - **数据结构与算法**（复杂度分析/数组/链表/栈/队列/哈希表/二分查找/位运算/树遍历/BST/堆/平衡树/B树/字典树/排序算法/图BFS-DFS/最短路径/拓扑排序/并查集/递归回溯/动态规划/字符串搜索KMP/贪心/缓存算法LRU）
+   - JavaSE（JVM/类加载/多线程/AQS/集合源码/IO/泛型/反射/异常/JMM）
+   - JavaWeb（HTTP/Servlet/Session-Cookie/过滤器拦截器/Tomcat）
+   - **JDBC与数据库连接池**（核心API/Druid-HikariCP/SQL注入防护/事务管理）
+   - **MyBatis/MyBatis-Plus**（ORM原理/动态SQL/缓存机制/QueryWrapper/代码生成器/分页插件）
+   - Spring 全家桶（IOC/AOP/Bean生命周期/循环依赖/SpringMVC/SpringBoot自动装配）
+   - **SSM整合**（父子容器/事务配置/全注解开发）
+   - **Spring Security**（认证授权/JWT/OAuth2/RBAC权限模型/过滤器链/方法级安全）
+   - **API设计与规范**（RESTful/GraphQL/gRPC/OpenAPI-Swagger-Knife4j/统一返回码/参数校验/版本控制/幂等性）
+   - **Web安全**（HTTPS-TLS/CORS/OWASP Top10/SQL注入-XSS-CSRF-DDoS防护/密码哈希bcrypt/加密AES-RSA）
+   - SpringCloudAlibaba（Nacos/Sentinel/Seata/RocketMQ/Dubbo整合）
+   - MySQL（InnoDB底层/索引/MVCC/事务隔离/锁机制/慢SQL优化/分库分表）
+   - Redis（数据结构/持久化/缓存问题/分布式锁/集群/淘汰策略）
+   - Git / Linux / Docker / Maven / Nginx / 计算机网络
+   - **操作系统**（进程-线程-协程/调度算法/内存管理/IPC/死锁/用户态内核态/文件系统）
+   - **计算机组成原理**（CPU缓存-伪共享/虚拟内存/IO模型BIO-NIO-epoll/零拷贝/存储层级）
+   - **前端基础**（HTML-CSS-JS/Vue响应式/闭包-原型链/Axios-Fetch/前后端分离）
+   - **文件上传与对象存储**（MultipartFile/OSS/MinIO/分片上传断点续传）
+   - **第三方工具框架**（Hutool/Lombok/MapStruct/Validation/EasyExcel-POI/Caffeine/Tika）
+   - **定时任务框架**（Spring Task/XXL-JOB/Quartz/Spring Async/SchedulerX）
+   - **监控运维体系**（Actuator/Spring Boot Admin/SkyWalking/Prometheus+Grafana/链路追踪）
+   - **测试框架**（JUnit5/Mockito/TestContainers/RestAssured/JMeter压力测试/覆盖率JaCoCo）
+   - **K8S容器编排**（Pod/Deployment/Service/Ingress/kubelet/探针/滚动更新/Helm/KubeSphere）
+   - **CI/CD流水线**（Jenkins/Jenkinsfile/GitLab-WebHook/SonarQube/Harbor/滚动发布/DevOps）
+   - **EFKS日志体系**（Elasticsearch/Filebeat/Kafka/Kibana/全链路traceId/日志脱敏）
+   - **系统设计**（短链接/秒杀/统一网关/日志平台/限流系统/IM聊天/RAG平台/负载均衡四层七层/多级缓存）
+   - 设计模式（单例/DCL/工厂/代理/策略/责任链/观察者/Spring中设计模式/框架设计模式应用）
+   - 分布式系统（CAP/BASE/一致性哈希/分布式ID/分布式锁/MQ）
+   - JVM 调优（内存模型/GC算法与收集器/GC日志分析/OOM排查/CPU飙升排查）
+   - Agent 开发（ReAct/Plan-Execute/多Agent协作/Function Calling/Tool Use/LangChain4j/Spring AI）
+   - RAG 架构（文档分块/Embedding选型/向量数据库/混合检索/Rerank重排序/Java集成）
+   - **大模型原理**（Transformer/Self-Attention/预训练-SFT-RLHF/上下文窗口/温度系数/Top-P-Top-K/分词器）
+   - **AIGC多模态生成**（文本/图片/视频/音频生成/流式响应SSE/内容审核/Token统计）
+   - **向量数据库**（Embedding/相似度检索/HNSW-IVF-PQ索引/Milvus/Pinecone/Chroma/Redis Vector）
+   - **Spring AI框架**（ChatClient/Prompt模板/Function Calling/流式输出/LangChain4j对比/RAG实现）
+   - 项目经验（STAR方法/技术选型Trade-off/项目难点深挖/架构演进/线上故障复盘）
+   - **面试综合准备**（简历优化STAR/HR面/行为面试/薪资谈判/八股复习策略/算法刷题计划）
+   - 多线程并发（线程池调优/ThreadLocal/CompletableFuture/ForkJoin/JMM）
+   - 锁机制（synchronized锁升级/AQS源码/CAS与ABA/死锁排查）
+   - 分布式事务/分布式缓存/分布式锁
+   - 微服务（服务拆分DDD/服务治理/链路追踪/Service Mesh）
+   - **微服务理论**（CAP-BASE推导/Raft算法/分布式ID雪花号段/分布式会话/接口幂等实现）
+   - Nacos / Seata / Sentinel / Gateway / Dubbo
+   - **OpenFeign**（声明式HTTP/超时重试/日志配置/Sentinel降级fallback/性能优化连接池）
+   - **负载均衡**（四层七层/轮询-加权-IP哈希-一致性哈希/虚拟节点/Nginx-Ribbon-LoadBalancer）
+   - **限流算法**（固定窗口/滑动窗口/漏桶/令牌桶/Guava RateLimiter/Sentinel/Redis+Lua分布式限流）
+   - **Sharding-JDBC**（分库分表/读写分离/跨库分页Join/分片键选择/分布式主键）
+   - **Flyway/Liquibase**（数据库版本管理/SQL脚本规范/CI-CD集成/团队协同变更管理）
+   - RocketMQ / Kafka / RabbitMQ（高吞吐原理/事务消息/可靠性/MQ选型对比）
+   - Elasticsearch（倒排索引/集群架构/NRT/深度分页/脑裂）
+   - ClickHouse（列式存储/MergeTree引擎/OLAP场景）
+   - MongoDB（文档模型/适用场景/vs RDBMS）
+   - Netty（线程模型/NIO零拷贝/TCP粘包拆包）
+   - Memcached（多线程/vs Redis/Session共享）
+   - 大厂真实面经题（GET vs POST/幂等设计/三色标记/Mark Word/Redis Geo等高频真题）
+
+
+2. 题型混合：概念简答题 + 实战场景题 + 手写代码/源码剖析题（禁止选择填空判断题）
+3. 难度混合：Easy / Medium / Hard 均有覆盖
+4. 每道题必须包含完整答案，详实有深度、面试官认可
+5. 优先互联网大厂高频真题，拒绝冷门偏僻知识点
+6. 知识点互不重复，每次覆盖 2 个以上不同技术模块
+7. 手写代码题需给出可运行的 Java 实现或清晰的伪代码，分析时间/空间复杂度
+8. **场景题优先从大厂真实面经中提取**（阿里淘天/字节/腾讯/快手/美团/OPPO等一线大厂面经）
+9. **设计模式题优先从《JavaGuide2025-设计模式》中提取**（单例/代理/策略/责任链等高频模式）
+10. **计算机网络题优先从《图解计算机网络(443页详版)》中提取**
+11. **消息队列深度题优先从《消息队列常见面试题(104页)》中提取**
+12. **数据结构与算法题优先参考左程云算法讲解和经典LeetCode高频题**（排序/二分/DP/图论/回溯等）
+13. **系统设计题优先参考学习路线中的经典题型**（短链接/秒杀/网关/限流/IM/RAG平台）
+
+
+## 执行步骤
+
+
+### 第一步：读取历史记录
+读取 D:\文件\题目\problem_history.json（精简格式，仅含 id 和 question），获取已有题目列表和当前最大 id。
+
+
+### 第二步：生成题目
+生成 300 道题目，每道包含：
+- tag：知识点标签（如 "Redis,分布式锁"、"Kafka,高吞吐"、"ES,倒排索引"、"设计模式,单例"、"计算机网络,TCP"、"数据结构,动态规划"、"操作系统,死锁"）
+- difficulty：Easy / Medium / Hard
+- question + answer
+
+
+写入临时 JSON 到 C:\Users\Administrator\WorkBuddy\2026-08-06-18-53-16\daily_questions.json
+
+
+### 第三步：去重检查
+与 problem_history.json 做 question 文本比对，重复则重新生成。
+
+
+### 第四步：合并写入
+执行："C:\Users\Administrator\.workbuddy\binaries\python\versions\3.13.12\python.exe" "C:\Users\Administrator\WorkBuddy\2026-08-06-18-53-16\merge_questions.py" "C:\Users\Administrator\WorkBuddy\2026-08-06-18-53-16\daily_questions.json"
+
+
+### 第五步：输出结果
+输出新增题目数量、摘要、题库总数、分卷文件名

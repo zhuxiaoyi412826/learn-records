@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boids 2D 鱼群模拟器</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: #08101e;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        /* 顶部控制栏 */
+        #controls {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(8px);
+            padding: 10px 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 20px;
+            align-items: center;
+            border-bottom: 1px solid #1e293b;
+            z-index: 10;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+        .control-group label {
+            font-weight: 600;
+            color: #94a3b8;
+            white-space: nowrap;
+        }
+        .control-group input[type="range"] {
+            width: 80px;
+            accent-color: #38bdf8;
+            cursor: pointer;
+        }
+        .control-group input[type="number"] {
+            width: 65px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: #38bdf8;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .control-group .val {
+            min-width: 30px;
+            color: #38bdf8;
+            font-family: monospace;
+        }
+        button {
+            background-color: #0284c7;
+            color: white;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #0369a1;
+        }
+        /* 画布区域 */
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            width: 100%;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="controls">
+        <div class="control-group">
+            <label for="count">鱼群数量</label>
+            <input type="range" id="count" min="0" max="1000" value="500">
+            <input type="number" id="count-num" min="0" max="1000" value="500">
+        </div>
+        <div class="control-group">
+            <label for="timeScale">时间倍速</label>
+            <input type="range" id="timeScale" min="0.1" max="5" step="0.1" value="1.0">
+            <span class="val" id="val-timeScale">1.0x</span>
+        </div>
+        <div class="control-group">
+            <label for="separation">排斥力</label>
+            <input type="range" id="separation" min="0" max="3" step="0.1" value="1.5">
+            <span class="val" id="val-separation">1.5</span>
+        </div>
+        <div class="control-group">
+            <label for="alignment">对齐力</label>
+            <input type="range" id="alignment" min="0" max="3" step="0.1" value="1.0">
+            <span class="val" id="val-alignment">1.0</span>
+        </div>
+        <div class="control-group">
+            <label for="cohesion">凝聚力</label>
+            <input type="range" id="cohesion" min="0" max="3" step="0.1" value="1.0">
+            <span class="val" id="val-cohesion">1.0</span>
+        </div>
+        <div class="control-group">
+            <label for="perception">感知半径</label>
+            <input type="range" id="perception" min="15" max="120" value="45">
+            <span class="val" id="val-perception">45</span>
+        </div>
+        <div class="control-group">
+            <label for="maxSpeed">基础速度</label>
+            <input type="range" id="maxSpeed" min="1" max="8" step="0.5" value="3.5">
+            <span class="val" id="val-maxSpeed">3.5</span>
+        </div>
+        <button id="reset-btn">重新生成</button>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="boidsCanvas"></canvas>
+    </div>
+
+    <script>
+        // 2D 向量类
+        class Vector {
+            constructor(x = 0, y = 0) {
+                this.x = x;
+                this.y = y;
+            }
+            add(v) { this.x += v.x; this.y += v.y; return this; }
+            sub(v) { this.x -= v.x; this.y -= v.y; return this; }
+            mult(n) { this.x *= n; this.y *= n; return this; }
+            div(n) { this.x /= n; this.y /= n; return this; }
+            mag() { return Math.sqrt(this.x * this.x + this.y * this.y); }
+            setMag(n) { return this.normalize().mult(n); }
+            normalize() {
+                let m = this.mag();
+                if (m !== 0) this.div(m);
+                return this;
+            }
+            limit(max) {
+                if (this.mag() > max) this.setMag(max);
+                return this;
+            }
+            static sub(v1, v2) { return new Vector(v1.x - v2.x, v1.y - v2.y); }
+            static dist(v1, v2) { return Math.hypot(v1.x - v2.x, v1.y - v2.y); }
+        }
+
+        // 模拟正态分布 (获取 0.8 到 1.4 之间的随机数)
+        function randomGaussian(min = 0.8, max = 1.4) {
+            let u = 0, v = 0;
+            while(u === 0) u = Math.random();
+            while(v === 0) v = Math.random();
+            let num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+            num = num / 6.0 + 0.5;
+            if (num < 0 || num > 1) return randomGaussian(min, max);
+            return min + num * (max - min);
+        }
+
+        // 鱼类个体
+        class Boid {
+            constructor(x, y, index) {
+                this.position = new Vector(x, y);
+                this.velocity = new Vector((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4);
+                this.acceleration = new Vector();
+                this.maxForce = 0.2;
+                this.tailPhase = Math.random() * Math.PI * 2;
+
+                // 20:20 比例规则（每 400 条有 1 条金色，每 20 条有 1 条红色）
+                if (index > 0 && index % 400 === 0) {
+                    this.type = 'gold';
+                    this.color = '#fbbf24';
+                    this.eyeColor = '#ffffff';
+                    this.typeScale = 1.8;
+                } else if (index > 0 && index % 20 === 0) {
+                    this.type = 'red';
+                    this.color = '#f43f5e';
+                    this.eyeColor = '#ffe4e6';
+                    this.typeScale = 1.3;
+                } else {
+                    this.type = 'normal';
+                    this.color = '#38bdf8';
+                    this.eyeColor = '#0f172a';
+                    this.typeScale = 1.0;
+                }
+
+                this.scale = randomGaussian(0.8, 1.4) * this.typeScale;
+                this.size = 7 * this.scale;
+            }
+
+            update(maxSpeed, timeScale) {
+                // 根据时间倍速计算实际加速度与速度变动
+                let scaledAcc = new Vector(this.acceleration.x, this.acceleration.y).mult(timeScale);
+                this.velocity.add(scaledAcc);
+                this.velocity.limit(maxSpeed);
+
+                // 位移根据时间倍速等比放大/缩小
+                let deltaVelocity = new Vector(this.velocity.x, this.velocity.y).mult(timeScale);
+                this.position.add(deltaVelocity);
+                this.acceleration.mult(0);
+
+                // 摆尾速度受时间倍速影响
+                this.tailPhase += (this.velocity.mag() * 0.15 + 0.05) * timeScale;
+            }
+
+            applyForce(force) {
+                this.acceleration.add(force);
+            }
+
+            // 边缘反弹，防止鱼出界
+            boundaries(width, height, maxSpeed) {
+                const margin = 40;
+                let desired = null;
+
+                if (this.position.x < margin) {
+                    desired = new Vector(maxSpeed, this.velocity.y);
+                } else if (this.position.x > width - margin) {
+                    desired = new Vector(-maxSpeed, this.velocity.y);
+                }
+
+                if (this.position.y < margin) {
+                    desired = new Vector(this.velocity.x, maxSpeed);
+                } else if (this.position.y > height - margin) {
+                    desired = new Vector(this.velocity.x, -maxSpeed);
+                }
+
+                if (desired !== null) {
+                    desired.setMag(maxSpeed);
+                    let steer = Vector.sub(desired, this.velocity);
+                    steer.limit(this.maxForce * 1.5);
+                    this.applyForce(steer);
+                }
+
+                this.position.x = Math.max(this.size, Math.min(width - this.size, this.position.x));
+                this.position.y = Math.max(this.size, Math.min(height - this.size, this.position.y));
+            }
+
+            flock(neighbors, weights, perceptionRadius, maxSpeed) {
+                let sep = new Vector();
+                let ali = new Vector();
+                let coh = new Vector();
+                let sepCount = 0, aliCount = 0, cohCount = 0;
+
+                for (let other of neighbors) {
+                    if (other === this) continue;
+                    let d = Vector.dist(this.position, other.position);
+
+                    if (d < perceptionRadius) {
+                        if (d < perceptionRadius * 0.5 && d > 0) {
+                            let diff = Vector.sub(this.position, other.position);
+                            diff.div(d * d);
+                            sep.add(diff);
+                            sepCount++;
+                        }
+                        ali.add(other.velocity);
+                        aliCount++;
+
+                        coh.add(other.position);
+                        cohCount++;
+                    }
+                }
+
+                if (sepCount > 0) sep.div(sepCount);
+                if (aliCount > 0) ali.div(aliCount);
+                if (cohCount > 0) {
+                    coh.div(cohCount);
+                    coh.sub(this.position);
+                }
+
+                this.steerTowards(sep, maxSpeed);
+                this.steerTowards(ali, maxSpeed);
+                this.steerTowards(coh, maxSpeed);
+
+                sep.mult(weights.separation);
+                ali.mult(weights.alignment);
+                coh.mult(weights.cohesion);
+
+                this.applyForce(sep);
+                this.applyForce(ali);
+                this.applyForce(coh);
+            }
+
+            steerTowards(vector, maxSpeed) {
+                if (vector.mag() > 0) {
+                    vector.setMag(maxSpeed);
+                    vector.sub(this.velocity);
+                    vector.limit(this.maxForce);
+                }
+            }
+
+            draw(ctx) {
+                let angle = Math.atan2(this.velocity.y, this.velocity.x);
+                let tailAngle = Math.sin(this.tailPhase) * 0.35;
+
+                ctx.save();
+                ctx.translate(this.position.x, this.position.y);
+                ctx.rotate(angle);
+
+                if (this.type === 'gold') {
+                    ctx.shadowColor = '#fbbf24';
+                    ctx.shadowBlur = 14;
+                } else if (this.type === 'red') {
+                    ctx.shadowColor = '#f43f5e';
+                    ctx.shadowBlur = 7;
+                }
+
+                let s = this.size;
+
+                // 胸鳍
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = 0.6;
+                ctx.beginPath();
+                ctx.ellipse(0, -s * 0.4, s * 0.5, s * 0.2, -Math.PI / 4, 0, Math.PI * 2);
+                ctx.ellipse(0, s * 0.4, s * 0.5, s * 0.2, Math.PI / 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 鱼身
+                ctx.globalAlpha = 1.0;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, s * 1.2, s * 0.5, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 尾巴
+                ctx.save();
+                ctx.translate(-s * 0.9, 0);
+                ctx.rotate(tailAngle);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(-s * 0.9, -s * 0.6);
+                ctx.quadraticCurveTo(-s * 0.6, 0, -s * 0.9, s * 0.6);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+
+                // 眼睛
+                ctx.fillStyle = this.eyeColor;
+                ctx.beginPath();
+                ctx.arc(s * 0.6, -s * 0.18, Math.max(1, s * 0.12), 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        // 空间网格性能优化
+        class SpatialHash {
+            constructor(cellSize) {
+                this.cellSize = cellSize;
+                this.grid = new Map();
+            }
+            clear() {
+                this.grid.clear();
+            }
+            getKey(x, y) {
+                const cx = Math.floor(x / this.cellSize);
+                const cy = Math.floor(y / this.cellSize);
+                return `${cx},${cy}`;
+            }
+            insert(boid) {
+                const key = this.getKey(boid.position.x, boid.position.y);
+                if (!this.grid.has(key)) {
+                    this.grid.set(key, []);
+                }
+                this.grid.get(key).push(boid);
+            }
+            getNeighbors(boid) {
+                const cx = Math.floor(boid.position.x / this.cellSize);
+                const cy = Math.floor(boid.position.y / this.cellSize);
+                let neighbors = [];
+
+                for (let x = -1; x <= 1; x++) {
+                    for (let y = -1; y <= 1; y++) {
+                        const key = `${cx + x},${cy + y}`;
+                        if (this.grid.has(key)) {
+                            neighbors.push(...this.grid.get(key));
+                        }
+                    }
+                }
+                return neighbors;
+            }
+        }
+
+        // Global Setup
+        const canvas = document.getElementById('boidsCanvas');
+        const ctx = canvas.getContext('2d');
+        let boids = [];
+        let spatialHash;
+
+        const inputs = {
+            count: document.getElementById('count'),
+            countNum: document.getElementById('count-num'),
+            timeScale: document.getElementById('timeScale'),
+            separation: document.getElementById('separation'),
+            alignment: document.getElementById('alignment'),
+            cohesion: document.getElementById('cohesion'),
+            perception: document.getElementById('perception'),
+            maxSpeed: document.getElementById('maxSpeed'),
+        };
+
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // 数量控制同步 (限制范围 0 ~ 1000)
+        function updateCount(val) {
+            let clamped = Math.max(0, Math.min(1000, parseInt(val) || 0));
+            inputs.count.value = clamped;
+            inputs.countNum.value = clamped;
+            adjustBoidsCount(clamped);
+        }
+
+        inputs.count.addEventListener('input', (e) => updateCount(e.target.value));
+        inputs.countNum.addEventListener('change', (e) => updateCount(e.target.value));
+
+        // 绑定 UI 文本更新
+        ['separation', 'alignment', 'cohesion', 'perception', 'maxSpeed'].forEach(key => {
+            const input = inputs[key];
+            const valSpan = document.getElementById(`val-${key}`);
+            input.addEventListener('input', () => valSpan.textContent = input.value);
+        });
+
+        inputs.timeScale.addEventListener('input', () => {
+            document.getElementById('val-timeScale').textContent = `${parseFloat(inputs.timeScale.value).toFixed(1)}x`;
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            initBoids(parseInt(inputs.count.value));
+        });
+
+        function getRandomSpawnPos() {
+            const margin = 50;
+            return {
+                x: margin + Math.random() * (Math.max(100, canvas.width - margin * 2)),
+                y: margin + Math.random() * (Math.max(100, canvas.height - margin * 2))
+            };
+        }
+
+        function initBoids(count) {
+            boids = [];
+            for (let i = 0; i < count; i++) {
+                let pos = getRandomSpawnPos();
+                boids.push(new Boid(pos.x, pos.y, i));
+            }
+        }
+
+        function adjustBoidsCount(targetCount) {
+            let current = boids.length;
+            if (targetCount > current) {
+                for (let i = current; i < targetCount; i++) {
+                    let pos = getRandomSpawnPos();
+                    boids.push(new Boid(pos.x, pos.y, i));
+                }
+            } else if (targetCount < current) {
+                boids.length = targetCount;
+            }
+        }
+
+        // 主逻辑循环
+        function animate() {
+            ctx.fillStyle = '#08101e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const weights = {
+                separation: parseFloat(inputs.separation.value),
+                alignment: parseFloat(inputs.alignment.value),
+                cohesion: parseFloat(inputs.cohesion.value)
+            };
+            const perception = parseFloat(inputs.perception.value);
+            const maxSpeed = parseFloat(inputs.maxSpeed.value);
+            const timeScale = parseFloat(inputs.timeScale.value);
+
+            spatialHash = new SpatialHash(perception);
+            for (let boid of boids) {
+                spatialHash.insert(boid);
+            }
+
+            for (let boid of boids) {
+                let neighbors = boids.length > 200 ? spatialHash.getNeighbors(boid) : boids;
+
+                boid.flock(neighbors, weights, perception, maxSpeed);
+                boid.boundaries(canvas.width, canvas.height, maxSpeed);
+                boid.update(maxSpeed, timeScale);
+                boid.draw(ctx);
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // 初始化运行
+        initBoids(parseInt(inputs.count.value));
+        animate();
+    </script>
+</body>
+</html>

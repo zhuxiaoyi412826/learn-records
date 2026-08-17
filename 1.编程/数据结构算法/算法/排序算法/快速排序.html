@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>快速排序 · 3D 可视化</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { overflow: hidden; font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; color: #dfe6ff; background: #070714; }
+  canvas { display: block; }
+  .panel {
+    position: fixed; z-index: 10;
+    background: rgba(12, 14, 32, .72);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(120, 140, 255, .18);
+    border-radius: 14px; padding: 14px 18px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .45);
+  }
+  .main-panel { top: 16px; left: 16px; width: 400px; max-width: calc(100vw - 32px); }
+  h1 { font-size: 20px; background: linear-gradient(90deg, #4dd0ff, #c86bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { font-size: 12px; color: #8a93c0; margin: 4px 0 12px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  button {
+    cursor: pointer; border: none; border-radius: 8px;
+    padding: 8px 14px; font-size: 13px; color: #fff;
+    background: rgba(90, 110, 220, .25); border: 1px solid rgba(120, 140, 255, .35);
+    transition: all .15s;
+  }
+  button:hover { background: rgba(90, 110, 220, .5); transform: translateY(-1px); }
+  #playBtn { background: linear-gradient(135deg, #3a7bd5, #8e44ad); border: none; font-weight: bold; min-width: 110px; }
+  .sliders label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #aab3dd; flex: 1; }
+  input[type=range] { flex: 1; accent-color: #6a8bff; }
+  #status { font-size: 13px; color: #ffd166; margin: 6px 0; min-height: 18px; }
+  .stats { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: #8a93c0; }
+  .stats b { color: #6fe3ff; font-family: Consolas, monospace; }
+  .legend { bottom: 16px; left: 16px; font-size: 12px; line-height: 1.9; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 8px; vertical-align: -1px; }
+  .sw-normal { background: linear-gradient(135deg, #22d3ee, #c026d3); }
+  .sw-pivot { background: #ff9500; box-shadow: 0 0 8px #ff9500; }
+  .sw-compare { background: #ff2d55; box-shadow: 0 0 8px #ff2d55; }
+  .sw-sorted { background: #00e676; box-shadow: 0 0 8px #00e676; }
+  .sw-range { background: rgba(80, 120, 255, .35); border: 1px solid #5577ff; }
+  .code-panel { top: 16px; right: 16px; width: 300px; max-width: calc(100vw - 32px); font-size: 12px; }
+  .code-panel summary { cursor: pointer; color: #9fb2ff; font-weight: bold; }
+  .code-panel pre { margin-top: 8px; font-family: Consolas, monospace; font-size: 11px; line-height: 1.6; color: #b8c4f0; white-space: pre-wrap; }
+  .tip { bottom: 16px; right: 16px; font-size: 12px; color: #8a93c0; }
+  @media (max-width: 900px) { .code-panel { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="panel main-panel">
+  <h1>快速排序 · 3D 可视化</h1>
+  <div class="sub">QuickSort 3D Visualization（Lomuto 分区方案）</div>
+  <div class="row">
+    <button id="playBtn">▶ 开始排序</button>
+    <button id="stepBtn">⏭ 单步</button>
+    <button id="shuffleBtn">🔀 打乱数组</button>
+  </div>
+  <div class="row sliders">
+    <label>速度 <input id="speedRange" type="range" min="1" max="100" value="60"><span id="speedVal">60</span></label>
+    <label>数量 <input id="sizeRange" type="range" min="10" max="60" value="32"><span id="sizeVal">32</span></label>
+  </div>
+  <div id="status">就绪</div>
+  <div class="stats">
+    <span>比较 <b id="cmpCount">0</b></span>
+    <span>交换 <b id="swpCount">0</b></span>
+    <span>进度 <b id="progress">0/0</b></span>
+    <span>最大递归深度 <b id="depthCount">0</b></span>
+  </div>
+</div>
+
+<details class="panel code-panel" open>
+  <summary>📖 算法伪代码</summary>
+  <pre>quickSort(A, lo, hi):
+  if lo ≥ hi: return
+  pivot = A[hi]          ← 选基准(橙)
+  i = lo
+  for j = lo … hi-1:     ← 比较(红)
+    if A[j] < pivot:
+      swap(A[i], A[j])
+      i++
+  swap(A[i], A[hi])      ← 基准归位(绿)
+  quickSort(A, lo, i-1)  ← 递归左半
+  quickSort(A, i+1, hi)  ← 递归右半</pre>
+</details>
+
+<div class="panel legend">
+  <div><i class="sw-normal"></i>普通元素（高度 = 数值）</div>
+  <div><i class="sw-pivot"></i>基准 Pivot</div>
+  <div><i class="sw-compare"></i>正在比较</div>
+  <div><i class="sw-sorted"></i>已归位</div>
+  <div><i class="sw-range"></i>当前分区范围</div>
+</div>
+
+<div class="panel tip">🖱 拖动旋转 · 滚轮缩放 · 空格键 开始/暂停</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+// ================= 配置 =================
+const BAR_W = 0.8, BAR_D = 0.8, GAP = 0.25, MAX_H = 9;
+const COLORS = {
+  pivot:   new THREE.Color(0xff9500),
+  compare: new THREE.Color(0xff2d55),
+  sorted:  new THREE.Color(0x00e676),
+};
+
+let scene, camera, renderer, composer, controls, rangePlane;
+let bars = [];
+let arraySize = 32, speed = 60;
+let steps = [], stepIndex = 0, playing = false;
+let comparisons = 0, swapCount = 0, maxDepth = 0;
+let swapAnim = null, lastStepTime = 0;
+
+const $ = id => document.getElementById(id);
+init();
+
+// ================= 初始化场景 =================
+function init() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x070714);
+  scene.fog = new THREE.Fog(0x070714, 90, 220);
+
+  camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 500);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  document.body.appendChild(renderer.domElement);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.maxPolarAngle = Math.PI / 2.05;
+  controls.minDistance = 8;
+  controls.maxDistance = 140;
+
+  // 灯光
+  scene.add(new THREE.AmbientLight(0x8899ff, 0.5));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.6);
+  dir.position.set(12, 26, 14);
+  dir.castShadow = true;
+  dir.shadow.mapSize.set(2048, 2048);
+  Object.assign(dir.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, far: 120 });
+  dir.shadow.camera.updateProjectionMatrix();
+  dir.shadow.bias = -0.0005;
+  scene.add(dir);
+  const p1 = new THREE.PointLight(0x3355ff, 500, 0, 2); p1.position.set(-18, 10, -10); scene.add(p1);
+  const p2 = new THREE.PointLight(0xff2d78, 500, 0, 2); p2.position.set(18, 10, 10);  scene.add(p2);
+
+  // 地面 + 网格
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(400, 400),
+    new THREE.MeshStandardMaterial({ color: 0x0d0d20, roughness: 0.9, metalness: 0.1 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+  const grid = new THREE.GridHelper(200, 100, 0x1c2b5a, 0x101a38);
+  grid.position.y = 0.01;
+  scene.add(grid);
+
+  // 分区范围指示板
+  rangePlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 3.2),
+    new THREE.MeshBasicMaterial({ color: 0x3366ff, transparent: true, opacity: 0.18, depthWrite: false })
+  );
+  rangePlane.rotation.x = -Math.PI / 2;
+  rangePlane.position.y = 0.03;
+  rangePlane.visible = false;
+  scene.add(rangePlane);
+
+  // 辉光后期
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.35, 0.7, 0.85));
+  composer.addPass(new OutputPass());
+
+  generateArray();
+  fitCamera();
+  bindUI();
+  animate();
+}
+
+// ================= 数组与柱子 =================
+function indexToX(i) { return (i - (arraySize - 1) / 2) * (BAR_W + GAP); }
+
+function valueColor(v) {
+  return new THREE.Color().setHSL(0.52 + 0.38 * (v / arraySize), 0.75, 0.55);
+}
+
+function generateArray() {
+  stopPlayback();
+  for (const b of bars) { scene.remove(b); b.geometry.dispose(); b.material.dispose(); }
+  bars = [];
+  const vals = Array.from({ length: arraySize }, (_, i) => i + 1);
+  for (let i = vals.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [vals[i], vals[j]] = [vals[j], vals[i]];
+  }
+  vals.forEach((v, i) => {
+    const geo = new THREE.BoxGeometry(BAR_W, 1, BAR_D);
+    geo.translate(0, 0.5, 0); // 原点移到底部，scale.y 即为高度
+    const base = valueColor(v);
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: base, roughness: 0.35, metalness: 0.25 }));
+    mesh.scale.y = 0.4 + (v / arraySize) * MAX_H;
+    mesh.position.set(indexToX(i), 0, 0);
+    mesh.castShadow = mesh.receiveShadow = true;
+    mesh.userData = { value: v, baseColor: base, state: 'normal', flashUntil: 0 };
+    scene.add(mesh);
+    bars.push(mesh);
+  });
+  resetStats();
+  setStatus('就绪 — 点击「开始排序」');
+  $('playBtn').textContent = '▶ 开始排序';
+}
+
+function fitCamera() {
+  const w = arraySize * (BAR_W + GAP);
+  camera.position.set(0, w * 0.32 + 4, w * 0.85 + 10);
+  controls.target.set(0, MAX_H * 0.35, 0);
+  controls.update();
+}
+
+// ================= 快速排序（预录制步骤） =================
+function buildSteps() {
+  const arr = bars.map(b => b.userData.value);
+  steps = []; stepIndex = 0;
+  qs(arr, 0, arr.length - 1, 1);
+  steps.push({ type: 'done' });
+
+  function qs(a, lo, hi, depth) {
+    if (lo > hi) return;
+    if (lo === hi) { steps.push({ type: 'sorted', index: lo }); return; }
+    steps.push({ type: 'range', lo, hi, depth });
+    const pivot = a[hi];
+    steps.push({ type: 'pivot', index: hi });
+    let i = lo;
+    for (let j = lo; j < hi; j++) {
+      steps.push({ type: 'compare', index: j });
+      if (a[j] < pivot) {
+        if (i !== j) { steps.push({ type: 'swap', a: i, b: j }); [a[i], a[j]] = [a[j], a[i]]; }
+        i++;
+      }
+    }
+    if (i !== hi) { steps.push({ type: 'swap', a: i, b: hi }); [a[i], a[hi]] = [a[hi], a[i]]; }
+    steps.push({ type: 'sorted', index: i });
+    qs(a, lo, i - 1, depth + 1);
+    qs(a, i + 1, hi, depth + 1);
+  }
+}
+
+// ================= 步骤回放 =================
+const stepDelay = () => Math.max(20, 520 - speed * 5);
+
+function processStep() {
+  if (stepIndex >= steps.length) return;
+  const s = steps[stepIndex++];
+  switch (s.type) {
+    case 'range': {
+      maxDepth = Math.max(maxDepth, s.depth);
+      rangePlane.scale.x = (s.hi - s.lo + 1) * (BAR_W + GAP);
+      rangePlane.position.x = (indexToX(s.lo) + indexToX(s.hi)) / 2;
+      rangePlane.material.color.setHSL((s.depth * 0.13) % 1, 0.7, 0.5);
+      rangePlane.visible = true;
+      break;
+    }
+    case 'pivot':
+      bars[s.index].userData.state = 'pivot';
+      applyFull(bars[s.index]);
+      break;
+    case 'compare': {
+      comparisons++;
+      const bar = bars[s.index];
+      if (bar.userData.state === 'normal') {
+        bar.material.color.copy(COLORS.compare);
+        bar.material.emissive.copy(COLORS.compare);
+        bar.material.emissiveIntensity = 0.8;
+        bar.userData.flashUntil = performance.now() + Math.max(150, stepDelay() * 0.8);
+      }
+      break;
+    }
+    case 'swap':
+      swapCount++;
+      startSwap(s.a, s.b);
+      break;
+    case 'sorted':
+      bars[s.index].userData.state = 'sorted';
+      applyFull(bars[s.index]);
+      break;
+    case 'done':
+      playing = false;
+      rangePlane.visible = false;
+      setStatus('🎉 排序完成！');
+      $('playBtn').textContent = '🔁 再来一次';
+      break;
+  }
+  updateStats();
+}
+
+// 根据柱子状态设置颜色与发光
+function applyFull(bar) {
+  const u = bar.userData, m = bar.material;
+  if (u.state === 'sorted')      { m.color.copy(COLORS.sorted); m.emissive.copy(COLORS.sorted); m.emissiveIntensity = 0.25; }
+  else if (u.state === 'pivot')  { m.color.copy(COLORS.pivot);  m.emissive.copy(COLORS.pivot);  m.emissiveIntensity = 0.35; }
+  else                           { m.color.copy(u.baseColor);   m.emissive.setRGB(0, 0, 0);     m.emissiveIntensity = 0; }
+}
+
+// ================= 交换动画（弧线抛接） =================
+function startSwap(a, b) {
+  if (a === b) return;
+  const mA = bars[a], mB = bars[b];
+  bars[a] = mB; bars[b] = mA; // 逻辑位置立即交换
+  swapAnim = { mA, mB, xA: indexToX(a), xB: indexToX(b), t0: performance.now(), dur: Math.max(120, stepDelay() * 0.9) };
+  mA.material.emissive.set(0xffffff); mA.material.emissiveIntensity = 0.6;
+  mB.material.emissive.set(0xffffff); mB.material.emissiveIntensity = 0.6;
+}
+
+function updateSwap(now) {
+  const t = Math.min(1, (now - swapAnim.t0) / swapAnim.dur);
+  const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // easeInOutCubic
+  const arc = Math.sin(e * Math.PI);
+  swapAnim.mA.position.x = swapAnim.xA + (swapAnim.xB - swapAnim.xA) * e;
+  swapAnim.mB.position.x = swapAnim.xB + (swapAnim.xA - swapAnim.xB) * e;
+  swapAnim.mA.position.y = arc * 2.2;
+  swapAnim.mB.position.y = arc * 1.2;
+  if (t >= 1) {
+    swapAnim.mA.position.set(swapAnim.xB, 0, 0);
+    swapAnim.mB.position.set(swapAnim.xA, 0, 0);
+    applyFull(swapAnim.mA);
+    applyFull(swapAnim.mB);
+    swapAnim = null;
+  }
+}
+
+// ================= 主循环 =================
+function animate() {
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  controls.update();
+
+  if (playing && !swapAnim && now - lastStepTime >= stepDelay()) {
+    lastStepTime = now;
+    processStep();
+  }
+  if (swapAnim) updateSwap(now);
+
+  // 恢复"比较中"的闪烁
+  for (const b of bars) {
+    if (b.userData.flashUntil && now > b.userData.flashUntil) {
+      b.userData.flashUntil = 0;
+      applyFull(b);
+    }
+  }
+  composer.render();
+}
+
+// ================= UI =================
+function resetToNormal() {
+  bars.forEach(b => { b.userData.state = 'normal'; b.userData.flashUntil = 0; applyFull(b); });
+}
+
+function bindUI() {
+  $('playBtn').onclick = () => {
+    $('playBtn').blur();
+    if (playing) {
+      playing = false;
+      setStatus('⏸ 已暂停');
+      $('playBtn').textContent = '▶ 继续';
+      return;
+    }
+    if (steps.length === 0 || stepIndex >= steps.length) {
+      if (steps.length > 0) generateArray(); // 已完成则重新打乱
+      resetToNormal();
+      buildSteps();
+      resetStats();
+    }
+    playing = true;
+    lastStepTime = 0;
+    setStatus('▶ 排序中…');
+    $('playBtn').textContent = '⏸ 暂停';
+  };
+
+  $('stepBtn').onclick = () => {
+    $('stepBtn').blur();
+    if (playing || swapAnim) return;
+    if (steps.length === 0 || stepIndex >= steps.length) {
+      if (steps.length > 0) generateArray();
+      resetToNormal();
+      buildSteps();
+      resetStats();
+      $('playBtn').textContent = '▶ 开始排序';
+    }
+    processStep();
+    setStatus('单步执行中');
+  };
+
+  $('shuffleBtn').onclick = () => { $('shuffleBtn').blur(); generateArray(); fitCamera(); };
+  $('speedRange').oninput = e => { speed = +e.target.value; $('speedVal').textContent = speed; };
+  $('sizeRange').oninput = e => { arraySize = +e.target.value; $('sizeVal').textContent = arraySize; };
+  $('sizeRange').onchange = () => { generateArray(); fitCamera(); };
+
+  addEventListener('keydown', e => {
+    if (e.code === 'Space' && !['INPUT', 'BUTTON'].includes(e.target.tagName)) {
+      e.preventDefault();
+      $('playBtn').click();
+    }
+  });
+
+  addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+    composer.setSize(innerWidth, innerHeight);
+  });
+}
+
+function stopPlayback() {
+  playing = false;
+  steps = []; stepIndex = 0;
+  swapAnim = null;
+  if (rangePlane) rangePlane.visible = false;
+}
+
+function resetStats() { comparisons = swapCount = maxDepth = 0; updateStats(); }
+
+function updateStats() {
+  $('cmpCount').textContent = comparisons;
+  $('swpCount').textContent = swapCount;
+  $('progress').textContent = `${stepIndex}/${steps.length}`;
+  $('depthCount').textContent = maxDepth;
+}
+
+function setStatus(t) { $('status').textContent = t; }
+</script>
+</body>
+</html>

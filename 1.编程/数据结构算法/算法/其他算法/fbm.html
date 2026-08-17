@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>分形布朗运动 3D 地形 · fBm Terrain</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#0b1120;
+    font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif; }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+
+  #title {
+    position:fixed; top:14px; left:50%; transform:translateX(-50%);
+    color:#e8f0ff; font-size:15px; letter-spacing:3px; z-index:5;
+    text-shadow:0 2px 8px rgba(0,0,0,.6); pointer-events:none; opacity:.9;
+  }
+  #panel {
+    position:fixed; top:16px; left:16px; width:295px; z-index:10;
+    background:rgba(13,19,34,.88); backdrop-filter:blur(12px);
+    border:1px solid rgba(96,150,255,.28); border-radius:14px;
+    padding:16px 18px; color:#dbe6f7; font-size:13px;
+    box-shadow:0 8px 32px rgba(0,0,0,.45);
+    max-height:calc(100vh - 32px); overflow-y:auto;
+  }
+  #panel::-webkit-scrollbar { width:6px; }
+  #panel::-webkit-scrollbar-thumb { background:rgba(96,150,255,.3); border-radius:3px; }
+  #panel h2 { font-size:16px; margin-bottom:4px; color:#9ec6ff; }
+  #panel .hint { font-size:11px; color:#7f8ca3; margin-bottom:10px; }
+  .section { margin:12px 0 8px; font-size:11px; color:#5f7099; letter-spacing:2px;
+    border-top:1px solid rgba(96,150,255,.15); padding-top:10px; }
+  select {
+    width:100%; background:#0f1830; color:#9ec6ff; padding:7px 8px;
+    border:1px solid rgba(96,150,255,.3); border-radius:8px; outline:none;
+    cursor:pointer; font-size:13px; margin-bottom:4px;
+  }
+  .control { margin-bottom:9px; }
+  .control label { display:flex; justify-content:space-between; margin-bottom:3px; color:#aebfd9; }
+  .control label span { color:#6fb2ff; font-variant-numeric:tabular-nums; }
+  .control input[type=range] { width:100%; accent-color:#4da3ff; height:18px; cursor:pointer; }
+  .checks { display:flex; gap:12px; flex-wrap:wrap; margin:12px 0; }
+  .checks label { display:flex; align-items:center; gap:5px; cursor:pointer; color:#aebfd9; font-size:12px; }
+  .checks input { accent-color:#4da3ff; cursor:pointer; }
+  #seedBtn {
+    width:100%; padding:9px; border:none; border-radius:8px; cursor:pointer;
+    background:linear-gradient(135deg,#3b82f6,#2563eb); color:#fff; font-size:13px;
+    transition:.2s; box-shadow:0 4px 14px rgba(59,130,246,.35);
+  }
+  #seedBtn:hover { transform:translateY(-1px); box-shadow:0 6px 18px rgba(59,130,246,.5); }
+  .footer { margin-top:10px; font-size:11px; color:#67748c; display:flex; justify-content:space-between; }
+  #fps { color:#7ee787; }
+
+  #loading,#error {
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:#0b1120; z-index:100; flex-direction:column; gap:14px;
+    color:#9ec6ff; font-size:14px;
+  }
+  #error { display:none; color:#ff9a9a; }
+  .spinner { width:36px; height:36px; border:3px solid rgba(110,178,255,.2);
+    border-top-color:#6eb2ff; border-radius:50%; animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  @media (max-width:640px){ #panel{ width:calc(100vw - 32px); } #title{ display:none; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="title">F R A C T A L &nbsp; B R O W N I A N &nbsp; M O T I O N</div>
+
+<div id="panel">
+  <h2>⛰️ 分形布朗运动 3D 地形</h2>
+  <p class="hint">左键旋转 · 滚轮缩放 · 右键平移</p>
+
+  <select id="noiseMode">
+    <option value="0">标准 fBm（分形布朗运动）</option>
+    <option value="1">山脊 Ridged Multifractal</option>
+    <option value="2">波涛 Billow（圆润丘陵）</option>
+    <option value="3">域扭曲 Domain Warping（有机·较慢）</option>
+  </select>
+
+  <div class="section">— 分形参数 —</div>
+  <div class="control">
+    <label>噪声缩放 <span id="v-scale">45</span></label>
+    <input type="range" id="scale" min="10" max="100" step="1" value="45">
+  </div>
+  <div class="control">
+    <label>倍频程 Octaves <span id="v-octaves">5</span></label>
+    <input type="range" id="octaves" min="1" max="8" step="1" value="5">
+  </div>
+  <div class="control">
+    <label>持续度 Persistence <span id="v-persistence">0.50</span></label>
+    <input type="range" id="persistence" min="0.1" max="0.9" step="0.05" value="0.5">
+  </div>
+  <div class="control">
+    <label>间隙度 Lacunarity <span id="v-lacunarity">2.00</span></label>
+    <input type="range" id="lacunarity" min="1.2" max="3.5" step="0.1" value="2">
+  </div>
+  <div class="control">
+    <label>扭曲强度（域扭曲用） <span id="v-warp">1.50</span></label>
+    <input type="range" id="warp" min="0" max="3" step="0.1" value="1.5">
+  </div>
+
+  <div class="section">— 地形塑形 —</div>
+  <div class="control">
+    <label>地形高度 <span id="v-amplitude">20</span></label>
+    <input type="range" id="amplitude" min="2" max="45" step="0.5" value="20">
+  </div>
+  <div class="control">
+    <label>高度指数（压平/抬升） <span id="v-exponent">1.00</span></label>
+    <input type="range" id="exponent" min="0.3" max="3" step="0.05" value="1">
+  </div>
+  <div class="control">
+    <label>梯田强度 <span id="v-terrace">0.00</span></label>
+    <input type="range" id="terrace" min="0" max="1" step="0.05" value="0">
+  </div>
+  <div class="control">
+    <label>岛屿衰减 <span id="v-falloff">0.35</span></label>
+    <input type="range" id="falloff" min="0" max="1" step="0.05" value="0.35">
+  </div>
+
+  <div class="section">— 环境与渲染 —</div>
+  <div class="control">
+    <label>演化速度 <span id="v-speed">0.15</span></label>
+    <input type="range" id="speed" min="0" max="1" step="0.05" value="0.15">
+  </div>
+  <div class="control">
+    <label>海平面 <span id="v-waterLevel">0.42</span></label>
+    <input type="range" id="waterLevel" min="0" max="1" step="0.01" value="0.42">
+  </div>
+  <div class="control">
+    <label>网格精度 <span id="v-resolution">128</span></label>
+    <input type="range" id="resolution" min="32" max="256" step="16" value="128">
+  </div>
+
+  <div class="checks">
+    <label><input type="checkbox" id="animate" checked> 动态演化</label>
+    <label><input type="checkbox" id="autoRotate"> 自动旋转</label>
+    <label><input type="checkbox" id="wireframe"> 线框</label>
+    <label><input type="checkbox" id="showWater" checked> 水面</label>
+  </div>
+
+  <button id="seedBtn">🎲 随机种子（重新生成）</button>
+  <div class="footer">
+    <span>顶点: <b id="vcount">--</b></span>
+    <span>FPS: <b id="fps">--</b></span>
+  </div>
+</div>
+
+<div id="loading"><div class="spinner"></div><div>正在加载 Three.js ...</div></div>
+<div id="error">⚠️ Three.js 加载失败，请检查网络连接后刷新页面</div>
+
+<script>
+/* ================= 多 CDN 备用加载 Three.js ================= */
+function loadScript(urls) {
+  return new Promise((resolve, reject) => {
+    let i = 0;
+    const tryNext = () => {
+      if (i >= urls.length) return reject(new Error('加载失败'));
+      const s = document.createElement('script');
+      s.src = urls[i++];
+      s.onload = resolve;
+      s.onerror = tryNext;
+      document.head.appendChild(s);
+    };
+    tryNext();
+  });
+}
+
+(async () => {
+  try {
+    await loadScript([
+      'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+      'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js',
+      'https://unpkg.com/three@0.128.0/build/three.min.js'
+    ]);
+    await loadScript([
+      'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js',
+      'https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js'
+    ]);
+    document.getElementById('loading').style.display = 'none';
+    init();
+  } catch (e) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error').style.display = 'flex';
+  }
+})();
+
+/* ============================================================
+   柏林噪声 + 分形布朗运动（fBm）算法库 —— 纯手写，零依赖
+   ============================================================ */
+class PerlinNoise {
+  constructor(seed = Math.floor(Math.random() * 1e9)) {
+    let s = seed % 2147483647;
+    if (s <= 0) s += 2147483646;
+    const random = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+
+    const perm = Array.from({ length: 256 }, (_, i) => i);
+    for (let i = 255; i > 0; i--) {           // Fisher-Yates 洗牌
+      const j = Math.floor(random() * (i + 1));
+      [perm[i], perm[j]] = [perm[j], perm[i]];
+    }
+    this.p = new Uint8Array(512);
+    for (let i = 0; i < 512; i++) this.p[i] = perm[i & 255];
+  }
+
+  fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+  lerp(t, a, b) { return a + t * (b - a); }
+  grad(hash, x, y, z) {
+    const h = hash & 15;
+    const u = h < 8 ? x : y;
+    const v = h < 4 ? y : (h === 12 || h === 14 ? x : z);
+    return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+  }
+
+  /* 经典 3D Perlin 噪声，输出约 [-1, 1] */
+  noise(x, y, z) {
+    const p = this.p;
+    const X = Math.floor(x) & 255, Y = Math.floor(y) & 255, Z = Math.floor(z) & 255;
+    x -= Math.floor(x); y -= Math.floor(y); z -= Math.floor(z);
+    const u = this.fade(x), v = this.fade(y), w = this.fade(z);
+    const A = p[X] + Y,   AA = p[A] + Z,   AB = p[A + 1] + Z;
+    const B = p[X+1] + Y, BA = p[B] + Z,   BB = p[B + 1] + Z;
+    return this.lerp(w,
+      this.lerp(v,
+        this.lerp(u, this.grad(p[AA],   x,   y,   z), this.grad(p[BA],   x-1, y,   z)),
+        this.lerp(u, this.grad(p[AB],   x,   y-1, z), this.grad(p[BB],   x-1, y-1, z))),
+      this.lerp(v,
+        this.lerp(u, this.grad(p[AA+1], x,   y,   z-1), this.grad(p[BA+1], x-1, y,   z-1)),
+        this.lerp(u, this.grad(p[AB+1], x,   y-1, z-1), this.grad(p[BB+1], x-1, y-1, z-1))));
+  }
+
+  /* 标准 fBm：Σ amplitude·persistenceⁱ · noise(p·lacunarityⁱ)，输出 [-1,1] */
+  fbm(x, y, z, oct, pers, lac) {
+    let sum = 0, amp = 1, freq = 1, max = 0;
+    for (let i = 0; i < oct; i++) {
+      sum  += this.noise(x * freq, y * freq, z * freq) * amp;
+      max  += amp;
+      amp  *= pers;
+      freq *= lac;
+    }
+    return sum / max;
+  }
+
+  /* 分形变体：mode 1=山脊 Ridged，mode 2=波涛 Billow，输出 [0,1] */
+  fractal(x, y, z, oct, pers, lac, mode) {
+    if (mode === 0) return this.fbm(x, y, z, oct, pers, lac);
+    let sum = 0, amp = 1, freq = 1, max = 0;
+    for (let i = 0; i < oct; i++) {
+      let n = this.noise(x * freq, y * freq, z * freq);
+      if (mode === 1) { n = 1 - Math.abs(n); n *= n; }  // 山脊：取反绝对值再平方 → 尖锐山脊线
+      else            { n = Math.abs(n); }              // 波涛：绝对值 → 圆润鼓包
+      sum  += n * amp;
+      max  += amp;
+      amp  *= pers;
+      freq *= lac;
+    }
+    return sum / max;
+  }
+
+  /* 域扭曲：fBm(p + warp·fBm(p))，让等值线弯折，产生有机形态，输出 [-1,1] */
+  warped(x, y, z, oct, pers, lac, warp) {
+    const qx = this.fbm(x,        y,        z, oct, pers, lac);
+    const qy = this.fbm(x + 31.4, y + 17.7, z, oct, pers, lac);
+    return this.fbm(x + warp * qx, y + warp * qy, z, oct, pers, lac);
+  }
+}
+
+/* ============================================================
+   Three.js 3D 场景
+   ============================================================ */
+function init() {
+  const params = {
+    mode: 0, scale: 45, octaves: 5, persistence: 0.5, lacunarity: 2.0, warp: 1.5,
+    amplitude: 20, exponent: 1.0, terrace: 0, falloff: 0.35,
+    speed: 0.15, waterLevel: 0.42,
+    animate: true
+  };
+  let perlin = new PerlinNoise();
+  let resolution = 128, terrain = null, vertexCount = 0;
+  let baseXY, coordX, coordY, r2Cache, hCache;
+  let noiseTime = Math.random() * 100;
+
+  /* ---------- 场景 / 相机 / 渲染器 ---------- */
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0b1120);
+  scene.fog = new THREE.Fog(0x0b1120, 260, 800);
+
+  const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 2000);
+  camera.position.set(130, 100, 130);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  document.getElementById('app').appendChild(renderer.domElement);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.maxPolarAngle = Math.PI * 0.495;
+  controls.minDistance = 30;
+  controls.maxDistance = 600;
+  controls.autoRotateSpeed = 1.2;
+
+  /* ---------- 灯光 ---------- */
+  scene.add(new THREE.AmbientLight(0x8899bb, 0.75));
+  const sun = new THREE.DirectionalLight(0xfff0d8, 1.5);
+  sun.position.set(120, 180, 90);
+  scene.add(sun);
+  const fill = new THREE.DirectionalLight(0x5f7fc0, 0.35);
+  fill.position.set(-100, 60, -120);
+  scene.add(fill);
+
+  /* ---------- 地形网格（含坐标缓存，性能优化） ---------- */
+  const SIZE = 220, HALF = SIZE / 2;
+  const terrainMat = new THREE.MeshStandardMaterial({
+    vertexColors: true, roughness: 0.95, metalness: 0.02
+  });
+
+  function buildTerrain() {
+    if (terrain) { scene.remove(terrain); terrain.geometry.dispose(); }
+    const geo = new THREE.PlaneGeometry(SIZE, SIZE, resolution, resolution);
+    vertexCount = geo.attributes.position.count;
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(vertexCount * 3), 3));
+    terrain = new THREE.Mesh(geo, terrainMat);
+    terrain.rotation.x = -Math.PI / 2;
+    scene.add(terrain);
+
+    baseXY  = new Float32Array(vertexCount * 2);
+    coordX  = new Float32Array(vertexCount);
+    coordY  = new Float32Array(vertexCount);
+    r2Cache = new Float32Array(vertexCount);
+    hCache  = new Float32Array(vertexCount);
+    const pos = geo.attributes.position;
+    for (let i = 0; i < vertexCount; i++) {
+      baseXY[i * 2]     = pos.getX(i);
+      baseXY[i * 2 + 1] = pos.getY(i);
+    }
+    updateCoordCache();
+    document.getElementById('vcount').textContent = vertexCount.toLocaleString();
+  }
+
+  /* 缩放坐标 + 中心距离平方：仅在缩放/精度变化时重算，避免每帧重复乘法 */
+  function updateCoordCache() {
+    const inv = 1 / params.scale;
+    for (let i = 0; i < vertexCount; i++) {
+      const bx = baseXY[i * 2], by = baseXY[i * 2 + 1];
+      coordX[i] = bx * inv;
+      coordY[i] = by * inv;
+      const dx = bx / HALF, dy = by / HALF;
+      r2Cache[i] = dx * dx + dy * dy;   // 中心 0 → 边缘 1 → 角落 2
+    }
+  }
+
+  /* ---------- 水面 ---------- */
+  const water = new THREE.Mesh(
+    new THREE.PlaneGeometry(SIZE * 4, SIZE * 4),
+    new THREE.MeshStandardMaterial({
+      color: 0x1b5e8a, transparent: true, opacity: 0.62,
+      roughness: 0.2, metalness: 0.55
+    })
+  );
+  water.rotation.x = -Math.PI / 2;
+  scene.add(water);
+  const waterY = () => (params.waterLevel * 2 - 1) * params.amplitude;
+
+  /* ---------- 高度色带 ---------- */
+  const STOPS = [
+    [0.00, 0.05, 0.16, 0.33],   // 深海
+    [0.36, 0.13, 0.40, 0.60],   // 浅海
+    [0.43, 0.80, 0.74, 0.54],   // 沙滩
+    [0.50, 0.26, 0.52, 0.27],   // 草地
+    [0.66, 0.15, 0.37, 0.20],   // 森林
+    [0.80, 0.47, 0.44, 0.42],   // 岩石
+    [0.90, 0.93, 0.94, 0.98],   // 积雪
+    [1.00, 1.00, 1.00, 1.00]
+  ];
+  function sstep(a, b, x) {
+    x = (x - a) / (b - a);
+    x = x < 0 ? 0 : x > 1 ? 1 : x;
+    return x * x * (3 - 2 * x);
+  }
+
+  /* ============================================================
+     核心管线：fBm 采样 → 归一化 → 岛屿衰减 → 指数重分布
+              → 梯田化 → 写入高度 → 法线 → (高度+坡度)着色
+     ============================================================ */
+  const TERRACE_STEPS = 12;
+  function updateTerrain() {
+    const geo  = terrain.geometry;
+    const pArr = geo.attributes.position.array;
+    const { amplitude, octaves, persistence, lacunarity,
+            mode, warp, exponent, terrace, falloff } = params;
+    const t = noiseTime;
+    const useExp = exponent !== 1, useTerr = terrace > 0, useFall = falloff > 0;
+
+    for (let i = 0; i < vertexCount; i++) {
+      const x = coordX[i], y = coordY[i];
+      let h;
+      if (mode === 3) {
+        h = (perlin.warped(x, y, t, octaves, persistence, lacunarity, warp) + 1) * 0.5;
+      } else if (mode === 0) {
+        h = (perlin.fbm(x, y, t, octaves, persistence, lacunarity) + 1) * 0.5;
+      } else {
+        h = perlin.fractal(x, y, t, octaves, persistence, lacunarity, mode); // 已是 [0,1]
+      }
+      if (useFall) h -= falloff * r2Cache[i] * 0.6;              // 岛屿径向衰减
+      h = h < 0 ? 0 : h > 1 ? 1 : h;
+      if (useExp)  h = Math.pow(h, exponent);                    // 高度重分布
+      if (useTerr) {                                             // 梯田化
+        const q = Math.round(h * TERRACE_STEPS) / TERRACE_STEPS;
+        h += (q - h) * terrace;
+      }
+      hCache[i] = h;
+      pArr[i * 3 + 2] = (h * 2 - 1) * amplitude;
+    }
+    geo.attributes.position.needsUpdate = true;
+    geo.computeVertexNormals();
+
+    /* 着色：基础高度色带 + 陡峭坡度染成岩石色 */
+    const cArr = geo.attributes.color.array;
+    const nArr = geo.attributes.normal.array;
+    for (let i = 0; i < vertexCount; i++) {
+      const h = hCache[i];
+      let k = 0;
+      while (k < STOPS.length - 2 && h > STOPS[k + 1][0]) k++;
+      const a = STOPS[k], b = STOPS[k + 1];
+      const f = (h - a[0]) / (b[0] - a[0] || 1);
+      let r = a[1] + (b[1] - a[1]) * f;
+      let g = a[2] + (b[2] - a[2]) * f;
+      let bl = a[3] + (b[3] - a[3]) * f;
+      const slope = 1 - nArr[i * 3 + 1];            // 法线 Y 越小越陡
+      if (slope > 0.35) {
+        const sf = sstep(0.35, 0.8, slope) * 0.85;  // 混入岩石灰
+        r  += (0.42 - r)  * sf;
+        g  += (0.40 - g)  * sf;
+        bl += (0.38 - bl) * sf;
+      }
+      cArr[i * 3]     = r;
+      cArr[i * 3 + 1] = g;
+      cArr[i * 3 + 2] = bl;
+    }
+    geo.attributes.color.needsUpdate = true;
+  }
+
+  /* ---------- UI 绑定 ---------- */
+  function bindRange(id, key, fmt, onChange) {
+    const el = document.getElementById(id);
+    const out = document.getElementById('v-' + id);
+    el.addEventListener('input', () => {
+      const v = parseFloat(el.value);
+      if (key) params[key] = v;
+      out.textContent = fmt ? fmt(v) : v;
+      if (onChange) onChange(v);
+      if (!params.animate) updateTerrain();
+    });
+  }
+  const f2 = v => v.toFixed(2);
+  bindRange('scale', 'scale', null, updateCoordCache);
+  bindRange('octaves', 'octaves');
+  bindRange('persistence', 'persistence', f2);
+  bindRange('lacunarity', 'lacunarity', f2);
+  bindRange('warp', 'warp', f2);
+  bindRange('amplitude', 'amplitude');
+  bindRange('exponent', 'exponent', f2);
+  bindRange('terrace', 'terrace', f2);
+  bindRange('falloff', 'falloff', f2);
+  bindRange('speed', 'speed', f2);
+  bindRange('waterLevel', 'waterLevel', f2);
+  bindRange('resolution', null, null, v => { resolution = v; buildTerrain(); updateTerrain(); });
+
+  document.getElementById('noiseMode').addEventListener('change', e => {
+    params.mode = parseInt(e.target.value);
+    updateTerrain();
+  });
+  document.getElementById('animate').addEventListener('change', e => params.animate = e.target.checked);
+  document.getElementById('autoRotate').addEventListener('change', e => controls.autoRotate = e.target.checked);
+  document.getElementById('wireframe').addEventListener('change', e => {
+    terrainMat.wireframe = e.target.checked;
+    if (!params.animate) updateTerrain();
+  });
+  document.getElementById('showWater').addEventListener('change', e => water.visible = e.target.checked);
+  document.getElementById('seedBtn').addEventListener('click', () => {
+    perlin = new PerlinNoise();
+    updateTerrain();
+  });
+
+  /* ---------- 主循环 ---------- */
+  const clock = new THREE.Clock();
+  const fpsEl = document.getElementById('fps');
+  let frames = 0, acc = 0;
+
+  function loop() {
+    requestAnimationFrame(loop);
+    const dt = Math.min(clock.getDelta(), 0.1);
+    controls.update();
+    if (params.animate) {
+      noiseTime += dt * params.speed;
+      updateTerrain();
+    }
+    water.position.y = waterY() + Math.sin(clock.elapsedTime * 0.9) * 0.25;
+    renderer.render(scene, camera);
+    frames++; acc += dt;
+    if (acc >= 0.5) { fpsEl.textContent = Math.round(frames / acc); frames = 0; acc = 0; }
+  }
+
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  buildTerrain();
+  updateTerrain();
+  loop();
+}
+</script>
+</body>
+</html>

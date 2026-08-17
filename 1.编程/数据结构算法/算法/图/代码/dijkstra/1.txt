@@ -1,0 +1,7 @@
+Main.java	程序入口，启动Swing GUI
+Node.java	图节点，含状态颜色、距离、起点/终点标记
+Edge.java	图边，含权重、箭头绘制、状态颜色
+Graph.java	图数据结构，支持单向/双向边
+GraphPanel.java	图编辑面板，拖拽/添加/删除交互
+DijkstraAnimator.java	算法动画控制器，逐步执行/回退
+DijkstraVisualizer.java	主窗口，工具栏/距离表/源码对话框

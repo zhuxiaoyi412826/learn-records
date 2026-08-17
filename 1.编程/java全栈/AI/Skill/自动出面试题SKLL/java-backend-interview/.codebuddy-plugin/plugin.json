@@ -1,0 +1,43 @@
+{
+  "name": "java-backend-interview",
+  "version": "1.0.0",
+  "description": "Java backend interview question generator and answer analyzer covering 70+ modules: JavaSE, data structures & algorithms, JDBC, MyBatis, Spring ecosystem, Spring Security, SpringCloudAlibaba, MySQL, Redis, Web security, API design, OS, computer architecture, Docker, K8s, CI/CD, EFKS, system design, AI (Agent/RAG/LLM/AIGC/vector DB), monitoring, testing, and more",
+  "author": {
+    "name": "WorkBuddy",
+    "email": ""
+  },
+  "agents": ["./agents/java-backend-interview.md"],
+
+  "expertType": "agent",
+  "agentName": "java-backend-interview",
+
+  "displayName": {
+    "en": "Java Backend Interviewer",
+    "zh": "Java后端面试官"
+  },
+  "profession": {
+    "en": "Senior Java Backend Interview Coach",
+    "zh": "资深Java后端面试出题官"
+  },
+  "displayDescription": {
+    "en": "Java backend interview expert covering 70+ modules: JavaSE, data structures & algorithms, JDBC, MyBatis, Spring ecosystem, Spring Security, SpringCloudAlibaba, MySQL, Redis, Web security, API design, OS, computer architecture, Docker, K8s, CI/CD, EFKS, system design, AI (Agent/RAG/LLM/AIGC/vector DB), monitoring, testing, and more. Three question types with six-dimension scoring.",
+    "zh": "Java后端面试出题解析专家，覆盖70+核心技术模块，支持简答场景手写代码三类题型与六维评分解析。"
+  },
+  "avatar": "avatars/expert.png",
+  "categoryId": "02-Engineering",
+  "defaultInitPrompt": {
+    "zh": "出题：中级后端，5道题目，MySQL+Redis+SpringCloud混合",
+    "en": "Generate questions: Mid-level backend, 5 questions, MySQL+Redis+SpringCloud mix"
+  },
+  "plugin": "java-backend-interview",
+  "tags": [
+    { "en": "Java Backend Interview", "zh": "Java后端面试" },
+    { "en": "Distributed & Microservices", "zh": "分布式微服务" },
+    { "en": "AI Engineering & DevOps", "zh": "AI工程与DevOps" }
+  ],
+  "quickPrompts": [
+    { "en": "Generate questions: Mid-level backend, 5 questions, MySQL+Redis+SpringCloud mix", "zh": "出题：中级后端，5道题目，MySQL+Redis+SpringCloud混合" },
+    { "en": "Generate questions: Senior backend, 2 hard scenario questions", "zh": "出题：高级后端，2道场景压轴题" },
+    { "en": "Paste your answer and I'll score and analyze it", "zh": "粘贴你的作答答案，我来打分解析" }
+  ]
+}

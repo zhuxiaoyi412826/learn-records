@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Kruskal 算法可视化与源码联动系统</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #080c14;
+      color: #e2e8f0;
+    }
+    #canvas-container {
+      width: 100vw;
+      height: 100vh;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* 滚动条样式 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(56, 189, 248, 0.5);
+    }
+
+    /* 通用毛玻璃卡片样式 */
+    .ui-card {
+      position: absolute;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ================= 左侧控制面板 ================= */
+    #sidebar-left {
+      top: 20px;
+      left: 20px;
+      width: 360px;
+      max-height: calc(100vh - 40px);
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(30, 41, 59, 0.5);
+    }
+    .sidebar-header h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #38bdf8;
+      letter-spacing: 0.5px;
+    }
+    .sidebar-header .subtitle {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    .sidebar-content {
+      padding: 16px 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* 配置组模块 */
+    .panel-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .section-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #38bdf8;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* 按钮样式 */
+    .btn-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .btn-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .btn-grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    button {
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.82rem;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    button:hover {
+      background: #334155;
+      border-color: #38bdf8;
+      color: #38bdf8;
+    }
+    button:active {
+      transform: scale(0.96);
+    }
+    button.primary {
+      background: #0284c7;
+      border-color: #38bdf8;
+      color: #fff;
+    }
+    button.primary:hover {
+      background: #0369a1;
+    }
+    button.code-btn {
+      background: #312e81;
+      border-color: #6366f1;
+      color: #c7d2fe;
+    }
+    button.code-btn:hover {
+      background: #3730a3;
+      color: #fff;
+    }
+    button.code-btn.active {
+      background: #4f46e5;
+      border-color: #818cf8;
+      color: #fff;
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.5);
+    }
+    button.danger {
+      background: #991b1b;
+      border-color: #f87171;
+    }
+    button.danger:hover {
+      background: #7f1d1d;
+    }
+
+    /* 表单与滑块控制 */
+    .control-item {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: #cbd5e1;
+    }
+    .control-val {
+      color: #38bdf8;
+      font-weight: 600;
+      font-family: monospace;
+    }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    input[type=range] {
+      flex: 1;
+      accent-color: #38bdf8;
+      cursor: pointer;
+      height: 4px;
+      background: #334155;
+      border-radius: 2px;
+    }
+    select {
+      width: 100%;
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 7px 10px;
+      border-radius: 6px;
+      outline: none;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+    select:focus {
+      border-color: #38bdf8;
+    }
+
+    /* Switch 开关 */
+    .switch-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      color: #cbd5e1;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider-toggle {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #334155;
+      transition: .3s;
+      border-radius: 20px;
+    }
+    .slider-toggle:before {
+      position: absolute;
+      content: "";
+      height: 14px; width: 14px;
+      left: 3px; bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+    input:checked + .slider-toggle {
+      background-color: #0284c7;
+    }
+    input:checked + .slider-toggle:before {
+      transform: translateX(16px);
+    }
+
+    /* ================= 右侧边列表面板 ================= */
+    #panel-right {
+      top: 20px;
+      right: 20px;
+      width: 240px;
+      max-height: calc(100vh - 180px);
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+    }
+    .edge-list-header {
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: #cbd5e1;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .edge-list {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: monospace;
+      font-size: 0.78rem;
+    }
+    .edge-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 8px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid transparent;
+      transition: all 0.15s;
+    }
+    .edge-item.current {
+      background: rgba(234, 179, 8, 0.25);
+      border-color: #eab308;
+      color: #fef08a;
+      font-weight: bold;
+    }
+    .edge-item.accepted {
+      background: rgba(34, 197, 94, 0.2);
+      border-color: #22c55e;
+      color: #86efac;
+    }
+    .edge-item.rejected {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      text-decoration: line-through;
+      opacity: 0.5;
+    }
+
+    /* ================= 最右侧源码显示面板 ================= */
+    #panel-code {
+      top: 20px;
+      right: 20px;
+      width: 360px;
+      max-height: calc(100vh - 180px);
+      display: none; /* 默认隐藏 */
+      flex-direction: column;
+      padding: 14px;
+      z-index: 12;
+    }
+    .code-container {
+      overflow-y: auto;
+      font-family: 'Consolas', 'Fira Code', 'Courier New', monospace;
+      font-size: 0.78rem;
+      background: rgba(5, 8, 16, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 8px 0;
+      margin-top: 6px;
+      position: relative;
+    }
+    .code-line {
+      padding: 4px 12px;
+      line-height: 1.5;
+      white-space: pre;
+      color: #94a3b8;
+      transition: all 0.2s ease;
+      border-left: 3px solid transparent;
+    }
+    .code-line.active {
+      background: rgba(56, 189, 248, 0.18);
+      color: #38bdf8;
+      border-left-color: #38bdf8;
+      font-weight: bold;
+    }
+    .code-line.active-success {
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+      border-left-color: #22c55e;
+      font-weight: bold;
+    }
+    .code-line.active-reject {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      border-left-color: #ef4444;
+      font-weight: bold;
+    }
+    /* 代码高亮语法 */
+    .c-kw { color: #f472b6; font-weight: 600; }  /* keyword */
+    .c-fn { color: #60a5fa; }  /* function */
+    .c-cm { color: #64748b; font-style: italic; } /* comment */
+    .c-var { color: #cbd5e1; } /* variable */
+    .c-str { color: #f59e0b; } /* string/number */
+
+    /* ================= 底部状态与日志面板 ================= */
+    #panel-bottom {
+      bottom: 20px;
+      left: 400px;
+      right: 20px;
+      height: 140px;
+      display: flex;
+      flex-direction: column;
+      padding: 12px 16px;
+    }
+    .stats-bar {
+      display: flex;
+      gap: 24px;
+      padding-bottom: 8px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 0.82rem;
+    }
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .stat-val {
+      font-weight: 700;
+      color: #38bdf8;
+      font-family: monospace;
+    }
+    #log-list {
+      list-style: none;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.78rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    #log-list li {
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .log-success { color: #4ade80; border-left: 3px solid #4ade80; }
+    .log-reject { color: #f87171; border-left: 3px solid #f87171; }
+    .log-info { color: #38bdf8; border-left: 3px solid #38bdf8; }
+
+    /* 图例 */
+    #legend-bar {
+      position: absolute;
+      bottom: 170px;
+      right: 20px;
+      display: flex;
+      gap: 12px;
+      padding: 8px 14px;
+      font-size: 0.75rem;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-color {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <!-- 左侧控制面板 -->
+  <div class="ui-card" id="sidebar-left">
+    <div class="sidebar-header">
+      <h1>3D Kruskal 算法控制台</h1>
+      <div class="subtitle">最小生成树 (MST) 可视化与源码联动系统</div>
+    </div>
+
+    <div class="sidebar-content">
+      <!-- 1. 算法执行控制 -->
+      <div class="panel-section">
+        <div class="section-title">算法控制</div>
+        <div class="btn-grid-3">
+          <button id="btn-play" class="primary">自动播放</button>
+          <button id="btn-step">单步执行</button>
+          <button id="btn-toggle-code" class="code-btn">💻 查看源码</button>
+        </div>
+        <div class="btn-grid-4" style="margin-top: 4px;">
+          <button id="btn-reset-algo" title="重置算法状态">重置算法</button>
+          <button id="btn-reset-cam" title="复位视角">重置视角</button>
+          <button id="btn-clear-log" title="清空日志">清空日志</button>
+          <button id="btn-rebuild" class="danger" title="重新构建完整图形">重建图</button>
+        </div>
+        <div class="control-item" style="margin-top: 6px;">
+          <div class="control-label">
+            <span>演示速度</span>
+            <span id="val-speed" class="control-val">1.0s</span>
+          </div>
+          <div class="slider-row">
+            <input type="range" id="slider-speed" min="50" max="2000" step="50" value="1000">
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. 图数据生成参数 -->
+      <div class="panel-section">
+        <div class="section-title">图结构参数配置</div>
+        
+        <div class="control-item">
+          <div class="control-label">
+            <span>节点数量 (V)</span>
+            <span id="val-nodes" class="control-val">16</span>
+          </div>
+          <div class="slider-row">
+            <input type="range" id="slider-nodes" min="5" max="80" step="1" value="16">
+          </div>
+        </div>
+
+        <div class="control-item">
+          <div class="control-label">
+            <span>边连接密度</span>
+            <span id="val-density" class="control-val">中度 (Medium)</span>
+          </div>
+          <div class="slider-row">
+            <input type="range" id="slider-density" min="1" max="4" step="1" value="2">
+          </div>
+        </div>
+
+        <div class="control-item">
+          <div class="control-label">
+            <span>3D 空间分布拓扑</span>
+          </div>
+          <select id="select-topology">
+            <option value="random">3D 随机立方体散布</option>
+            <option value="sphere">球体表面分布 (Sphere)</option>
+            <option value="clusters">多核心集群分布 (Clusters)</option>
+            <option value="grid">3D 分层网格结构 (Grid)</option>
+          </select>
+        </div>
+
+        <div class="control-item">
+          <div class="control-label">
+            <span>空间缩放范围</span>
+            <span id="val-space" class="control-val">30</span>
+          </div>
+          <div class="slider-row">
+            <input type="range" id="slider-space" min="15" max="60" step="5" value="30">
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 视觉与显示自定义设置 -->
+      <div class="panel-section">
+        <div class="section-title">视觉渲染设置</div>
+
+        <div class="control-item">
+          <div class="control-label">
+            <span>节点半径大小</span>
+            <span id="val-node-size" class="control-val">1.0</span>
+          </div>
+          <div class="slider-row">
+            <input type="range" id="slider-node-size" min="0.3" max="2.5" step="0.1" value="1.0">
+          </div>
+        </div>
+
+        <div class="control-item">
+          <div class="control-label">
+            <span>边线粗细度</span>
+            <span id="val-edge-size" class="control-val">1.0</span>
+          </div>
+          <div class="slider-row">
+            <input type="range" id="slider-edge-size" min="0.3" max="3.0" step="0.1" value="1.0">
+          </div>
+        </div>
+
+        <div class="switch-row">
+          <span>显示边权重文字标签</span>
+          <label class="switch">
+            <input type="checkbox" id="toggle-labels" checked>
+            <span class="slider-toggle"></span>
+          </label>
+        </div>
+
+        <div class="switch-row">
+          <span>镜头自动缓慢旋转</span>
+          <label class="switch">
+            <input type="checkbox" id="toggle-autorotate">
+            <span class="slider-toggle"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右侧边列表 -->
+  <div class="ui-card" id="panel-right">
+    <div class="edge-list-header">
+      <span>排序边队列</span>
+      <span id="val-edge-count" style="color:#38bdf8;">0 条</span>
+    </div>
+    <div class="edge-list" id="edge-list-container"></div>
+  </div>
+
+  <!-- 最右侧源码显示面板 -->
+  <div class="ui-card" id="panel-code">
+    <div class="edge-list-header">
+      <span>Kruskal 核心源码算法 (JS)</span>
+      <span id="btn-close-code" style="cursor:pointer; color:#f87171; font-size:1.1rem; padding:0 4px;" title="关闭源码面板">✕</span>
+    </div>
+    <div class="code-container">
+      <div class="code-line" data-line="sort"><span class="c-cm">// 1. 按边权重升序排序候选边</span>
+<span class="c-var">edges</span>.<span class="c-fn">sort</span>((<span class="c-var">a, b</span>) => <span class="c-var">a.weight</span> - <span class="c-var">b.weight</span>);</div>
+      
+      <div class="code-line" data-line="init"><span class="c-cm">// 2. 初始化并查集 DSU</span>
+<span class="c-kw">const</span> <span class="c-var">dsu</span> = <span class="c-kw">new</span> <span class="c-fn">DSU</span>(<span class="c-var">vertexCount</span>);</div>
+
+      <div class="code-line" data-line="loop-start"><span class="c-cm">// 3. 顺序遍历每条权值最小的边</span>
+<span class="c-kw">for</span> (<span class="c-kw">let</span> <span class="c-var">edge</span> <span class="c-kw">of</span> <span class="c-var">sortedEdges</span>) {</div>
+
+      <div class="code-line" data-line="find-root">  <span class="c-cm">// 4. 查询两端点的连通集合根节点</span>
+  <span class="c-kw">let</span> <span class="c-var">rootU</span> = <span class="c-var">dsu</span>.<span class="c-fn">find</span>(<span class="c-var">edge.u</span>);
+  <span class="c-kw">let</span> <span class="c-var">rootV</span> = <span class="c-var">dsu</span>.<span class="c-fn">find</span>(<span class="c-var">edge.v</span>);</div>
+
+      <div class="code-line" data-line="check-cycle">  <span class="c-kw">if</span> (<span class="c-var">rootU</span> !== <span class="c-var">rootV</span>) {</div>
+
+      <div class="code-line" data-line="accept">    <span class="c-cm">// 5. 无环: 合并并查集，加入 MST</span>
+    <span class="c-var">dsu</span>.<span class="c-fn">union</span>(<span class="c-var">rootU</span>, <span class="c-var">rootV</span>);
+    <span class="c-var">mst</span>.<span class="c-fn">push</span>(<span class="c-var">edge</span>);</div>
+
+      <div class="code-line" data-line="reject">  } <span class="c-kw">else</span> {
+    <span class="c-cm">// 6. 有环: 抛弃该边，避免闭环</span>
+    <span class="c-var">rejected</span>.<span class="c-fn">push</span>(<span class="c-var">edge</span>);
+  }</div>
+
+      <div class="code-line" data-line="loop-end">}</div>
+
+      <div class="code-line" data-line="complete"><span class="c-cm">// 7. 返回构成的最小生成树结果</span>
+<span class="c-kw">return</span> <span class="c-var">mst</span>;</div>
+    </div>
+  </div>
+
+  <!-- 图例 -->
+  <div class="ui-card" id="legend-bar">
+    <div class="legend-item">
+      <div class="legend-color" style="background: #eab308;"></div>
+      <span>评估当前边</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #22c55e;"></div>
+      <span>成功选中 (MST)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #ef4444;"></div>
+      <span>形成闭环 (舍弃)</span>
+    </div>
+  </div>
+
+  <!-- 底部状态日志面板 -->
+  <div class="ui-card" id="panel-bottom">
+    <div class="stats-bar">
+      <div class="stat-item">总节点数: <span id="stat-nodes-count" class="stat-val">0</span></div>
+      <div class="stat-item">已选边数: <span id="stat-edges-count" class="stat-val">0 / 0</span></div>
+      <div class="stat-item">连通分量数: <span id="stat-components" class="stat-val">0</span></div>
+      <div class="stat-item">MST 总权重: <span id="stat-total-weight" class="stat-val">0</span></div>
+    </div>
+    <ul id="log-list"></ul>
+  </div>
+
+  <script>
+    // --- 1. 并查集 (DSU) 类 ---
+    class DSU {
+      constructor(n) {
+        this.parent = Array.from({ length: n }, (_, i) => i);
+        this.rank = new Array(n).fill(0);
+        this.components = n;
+      }
+      find(i) {
+        if (this.parent[i] === i) return i;
+        return this.parent[i] = this.find(this.parent[i]);
+      }
+      union(i, j) {
+        let rootI = this.find(i);
+        let rootJ = this.find(j);
+        if (rootI !== rootJ) {
+          if (this.rank[rootI] < this.rank[rootJ]) [rootI, rootJ] = [rootJ, rootI];
+          this.parent[rootJ] = rootI;
+          if (this.rank[rootI] === this.rank[rootJ]) this.rank[rootI]++;
+          this.components--;
+          return true;
+        }
+        return false;
+      }
+    }
+
+    // --- 2. 全局状态与 Three.js 变量 ---
+    const STATE = {
+      nodeCount: 16,
+      density: 2, // 1: 稀疏, 2: 中度, 3: 稠密, 4: 极高密度
+      topology: 'random',
+      spaceSize: 30,
+      nodeScale: 1.0,
+      edgeScale: 1.0,
+      showLabels: true,
+      autoRotate: false,
+      speed: 1000,
+      showCodePanel: false, // 源码显示面板开关标识
+      
+      // 算法运行时数据
+      nodes: [],
+      edges: [],
+      sortedEdges: [],
+      currentStep: 0,
+      mstWeight: 0,
+      acceptedCount: 0,
+      isPlaying: false,
+      timer: null
+    };
+
+    const COLORS = {
+      node: 0x38bdf8,
+      edgeDefault: 0x334155,
+      edgeTesting: 0xeab308,
+      edgeAccepted: 0x22c55e,
+      edgeRejected: 0xef4444
+    };
+
+    let scene, camera, renderer, controls;
+    let nodeMeshes = [], edgeMeshes = [], edgeLabels = [], nodeLabels = [];
+
+    // --- 3. 初始化 Three.js 场景 ---
+    function initThree() {
+      const container = document.getElementById('canvas-container');
+      
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x080c14, 0.015);
+
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(35, 25, 45);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      container.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+
+      // 灯光配置
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(30, 50, 30);
+      scene.add(dirLight);
+
+      const pointLight = new THREE.PointLight(0x38bdf8, 1.2, 80);
+      pointLight.position.set(0, 0, 0);
+      scene.add(pointLight);
+
+      // 网格底盘
+      const grid = new THREE.GridHelper(100, 50, 0x1e293b, 0x0f172a);
+      grid.position.y = -STATE.spaceSize / 2 - 4;
+      scene.add(grid);
+
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    // --- 4. 2D 文字 Sprite 动态创建 ---
+    function createTextSprite(text, colorHex = '#ffffff', bgHex = '#00000000', fontSize = 34) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = bgHex;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.font = `Bold ${fontSize}px Arial, sans-serif`;
+      ctx.fillStyle = colorHex;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+      const sprite = new THREE.Sprite(spriteMaterial);
+      sprite.scale.set(3.2, 1.6, 1);
+      return sprite;
+    }
+
+    // --- 5. 多种 3D 图拓扑位置生成器 ---
+    function generateNodePositions(count, topology, space) {
+      const positions = [];
+      const half = space / 2;
+
+      for (let i = 0; i < count; i++) {
+        let pos = new THREE.Vector3();
+
+        if (topology === 'random') {
+          pos.set(
+            (Math.random() - 0.5) * space,
+            (Math.random() - 0.5) * (space * 0.7),
+            (Math.random() - 0.5) * space
+          );
+        } else if (topology === 'sphere') {
+          const phi = Math.acos(-1 + (2 * i) / count);
+          const theta = Math.sqrt(count * Math.PI) * phi;
+          const r = half * 0.8;
+          pos.set(
+            r * Math.cos(theta) * Math.sin(phi),
+            r * Math.sin(theta) * Math.sin(phi),
+            r * Math.cos(phi)
+          );
+        } else if (topology === 'clusters') {
+          const clusterCount = Math.min(4, Math.ceil(count / 4));
+          const cIdx = i % clusterCount;
+          const angle = (cIdx / clusterCount) * Math.PI * 2;
+          const center = new THREE.Vector3(
+            Math.cos(angle) * (space * 0.35),
+            (Math.random() - 0.5) * 6,
+            Math.sin(angle) * (space * 0.35)
+          );
+          pos.copy(center).add(new THREE.Vector3(
+            (Math.random() - 0.5) * (space * 0.25),
+            (Math.random() - 0.5) * (space * 0.25),
+            (Math.random() - 0.5) * (space * 0.25)
+          ));
+        } else if (topology === 'grid') {
+          const side = Math.ceil(Math.cbrt(count));
+          const gap = space / Math.max(1, side - 1);
+          const ix = i % side;
+          const iy = Math.floor(i / side) % side;
+          const iz = Math.floor(i / (side * side));
+          pos.set(
+            ix * gap - half,
+            iy * gap - half * 0.6,
+            iz * gap - half
+          );
+        }
+        positions.push(pos);
+      }
+      return positions;
+    }
+
+    // --- 6. 构建联通图与 3D 渲染 ---
+    function buildGraph() {
+      clearScene();
+      stopAutoPlay();
+
+      const { nodeCount, topology, spaceSize, density } = STATE;
+      
+      // 1. 生成节点
+      const positions = generateNodePositions(nodeCount, topology, spaceSize);
+      STATE.nodes = positions.map((pos, id) => ({ id, pos }));
+
+      // 2. 保证全连通性并生成边
+      STATE.edges = [];
+      const addedEdges = new Set();
+
+      const inTree = new Set([0]);
+      while (inTree.size < nodeCount) {
+        let bestU = -1, bestV = -1, minD = Infinity;
+        for (let u of inTree) {
+          for (let v = 0; v < nodeCount; v++) {
+            if (!inTree.has(v)) {
+              let d = STATE.nodes[u].pos.distanceTo(STATE.nodes[v].pos);
+              if (d < minD) {
+                minD = d; bestU = u; bestV = v;
+              }
+            }
+          }
+        }
+        let u = Math.min(bestU, bestV);
+        let v = Math.max(bestU, bestV);
+        let weight = Math.round(minD * 1.5) || 1;
+        STATE.edges.push({ u, v, weight });
+        addedEdges.add(`${u}-${v}`);
+        inTree.add(bestV);
+      }
+
+      // 增加邻接边
+      const neighborsPerNode = density === 1 ? 1 : density === 2 ? 3 : density === 3 ? 5 : 8;
+      for (let i = 0; i < nodeCount; i++) {
+        let dists = [];
+        for (let j = 0; j < nodeCount; j++) {
+          if (i !== j) {
+            dists.push({ id: j, dist: STATE.nodes[i].pos.distanceTo(STATE.nodes[j].pos) });
+          }
+        }
+        dists.sort((a, b) => a.dist - b.dist);
+
+        let addCount = Math.min(neighborsPerNode, dists.length);
+        for (let k = 0; k < addCount; k++) {
+          let u = Math.min(i, dists[k].id);
+          let v = Math.max(i, dists[k].id);
+          let key = `${u}-${v}`;
+          if (!addedEdges.has(key)) {
+            let weight = Math.round(dists[k].dist * 1.5) || 1;
+            STATE.edges.push({ u, v, weight });
+            addedEdges.add(key);
+          }
+        }
+      }
+
+      // 3. 渲染节点 Meshes
+      const nodeRadius = 0.8 * STATE.nodeScale;
+      STATE.nodes.forEach(n => {
+        const geo = new THREE.SphereGeometry(nodeRadius, 32, 32);
+        const mat = new THREE.MeshPhongMaterial({
+          color: COLORS.node,
+          emissive: 0x0284c7,
+          emissiveIntensity: 0.3,
+          shininess: 90
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(n.pos);
+        scene.add(mesh);
+        nodeMeshes.push(mesh);
+
+        // 节点 Label
+        const label = createTextSprite(`V${n.id}`, '#ffffff', '#00000000', 40);
+        label.position.copy(n.pos).add(new THREE.Vector3(0, nodeRadius + 0.8, 0));
+        scene.add(label);
+        nodeLabels.push(label);
+      });
+
+      // 4. 渲染边 Meshes
+      STATE.edges.forEach(e => {
+        const uPos = STATE.nodes[e.u].pos;
+        const vPos = STATE.nodes[e.v].pos;
+
+        const mesh = createEdgeCylinder(uPos, vPos, 0.1 * STATE.edgeScale, COLORS.edgeDefault, 0.35);
+        scene.add(mesh);
+        edgeMeshes.push(mesh);
+
+        // 边权重 Label
+        const mid = new THREE.Vector3().addVectors(uPos, vPos).multiplyScalar(0.5);
+        const label = createTextSprite(`${e.weight}`, '#94a3b8', '#0f172a99', 30);
+        label.position.copy(mid).add(new THREE.Vector3(0, 0.4, 0));
+        label.visible = STATE.showLabels;
+        scene.add(label);
+        edgeLabels.push(label);
+      });
+
+      resetAlgorithmState();
+    }
+
+    // 创建 3D 圆柱体边线
+    function createEdgeCylinder(p1, p2, radius, color, opacity) {
+      const dir = new THREE.Vector3().subVectors(p2, p1);
+      const len = dir.length();
+      const geo = new THREE.CylinderGeometry(radius, radius, len, 8);
+      const mat = new THREE.MeshStandardMaterial({
+        color: color,
+        transparent: true,
+        opacity: opacity,
+        roughness: 0.4
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+
+      const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+      mesh.position.copy(mid);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+      return mesh;
+    }
+
+    // 清空场景实体
+    function clearScene() {
+      nodeMeshes.forEach(m => scene.remove(m));
+      edgeMeshes.forEach(m => scene.remove(m));
+      edgeLabels.forEach(l => scene.remove(l));
+      nodeLabels.forEach(l => scene.remove(l));
+      nodeMeshes = []; edgeMeshes = []; edgeLabels = []; nodeLabels = [];
+    }
+
+    // --- 7. Kruskal 算法逻辑与源码联动高亮 ---
+    function highlightCodeLine(lineKey, mode = 'active') {
+      const lines = document.querySelectorAll('.code-line');
+      lines.forEach(l => {
+        l.classList.remove('active', 'active-success', 'active-reject');
+      });
+
+      if (!lineKey) return;
+      const target = document.querySelector(`.code-line[data-line="${lineKey}"]`);
+      if (target) {
+        target.classList.add(mode);
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
+    function resetAlgorithmState() {
+      stopAutoPlay();
+      STATE.dsu = new DSU(STATE.nodes.length);
+      
+      // 按权重升序排序
+      STATE.sortedEdges = STATE.edges.map((e, idx) => ({ ...e, originalIndex: idx, status: 'default' }))
+                                     .sort((a, b) => a.weight - b.weight);
+
+      STATE.currentStep = 0;
+      STATE.mstWeight = 0;
+      STATE.acceptedCount = 0;
+
+      // 还原所有边视觉
+      edgeMeshes.forEach(mesh => {
+        mesh.material.color.setHex(COLORS.edgeDefault);
+        mesh.material.opacity = 0.35;
+        mesh.scale.set(1, 1, 1);
+      });
+
+      highlightCodeLine('sort');
+      updateUI();
+      logMessage(`算法已就绪！包含 ${STATE.nodes.length} 个节点，${STATE.sortedEdges.length} 条已排序候选边。`, 'info');
+    }
+
+    function stepAlgorithm() {
+      if (STATE.currentStep >= STATE.sortedEdges.length) {
+        highlightCodeLine('complete', 'active-success');
+        logMessage(`算法完毕！所有边均已评估完毕。`, 'success');
+        stopAutoPlay();
+        return false;
+      }
+
+      if (STATE.acceptedCount === STATE.nodes.length - 1) {
+        highlightCodeLine('complete', 'active-success');
+        logMessage(`MST 构建成功！已连通全部 ${STATE.nodes.length} 个节点。`, 'success');
+        stopAutoPlay();
+        return false;
+      }
+
+      const edge = STATE.sortedEdges[STATE.currentStep];
+      const { u, v, weight, originalIndex } = edge;
+
+      // 高亮查询阶段
+      highlightCodeLine('find-root', 'active');
+
+      const isUnionSuccess = STATE.dsu.union(u, v);
+      const mesh = edgeMeshes[originalIndex];
+
+      if (isUnionSuccess) {
+        // 接受该边
+        edge.status = 'accepted';
+        mesh.material.color.setHex(COLORS.edgeAccepted);
+        mesh.material.opacity = 1.0;
+        mesh.scale.set(1.6, 1, 1.6);
+
+        STATE.mstWeight += weight;
+        STATE.acceptedCount++;
+        
+        // 源码联动高亮 accept 行
+        highlightCodeLine('accept', 'active-success');
+        logMessage(`选入边 (V${u}, V${v}) [权: ${weight}]: 成功合并两个连通分量。`, 'success');
+      } else {
+        // 舍弃该边（形成闭环）
+        edge.status = 'rejected';
+        mesh.material.color.setHex(COLORS.edgeRejected);
+        mesh.material.opacity = 0.12;
+        mesh.scale.set(0.7, 1, 0.7);
+
+        // 源码联动高亮 reject 行
+        highlightCodeLine('reject', 'active-reject');
+        logMessage(`舍弃边 (V${u}, V${v}) [权: ${weight}]: 节点属于同一连通集 (产生闭环)。`, 'reject');
+      }
+
+      STATE.currentStep++;
+      updateUI();
+
+      if (STATE.acceptedCount === STATE.nodes.length - 1) {
+        setTimeout(() => highlightCodeLine('complete', 'active-success'), 400);
+        logMessage(`🎉 最小生成树生成完毕！总权重: ${STATE.mstWeight}`, 'success');
+        stopAutoPlay();
+      }
+
+      return true;
+    }
+
+    // --- 8. UI 面板实时更新 ---
+    function updateUI() {
+      document.getElementById('stat-nodes-count').innerText = STATE.nodes.length;
+      document.getElementById('stat-edges-count').innerText = `${STATE.acceptedCount} / ${STATE.nodes.length - 1}`;
+      document.getElementById('stat-components').innerText = STATE.dsu ? STATE.dsu.components : STATE.nodes.length;
+      document.getElementById('stat-total-weight').innerText = STATE.mstWeight;
+      document.getElementById('val-edge-count').innerText = `${STATE.sortedEdges.length} 条`;
+
+      // 渲染右侧队列
+      const container = document.getElementById('edge-list-container');
+      container.innerHTML = '';
+
+      STATE.sortedEdges.forEach((e, idx) => {
+        const item = document.createElement('div');
+        let statusClass = '';
+        if (e.status === 'accepted') statusClass = 'accepted';
+        else if (e.status === 'rejected') statusClass = 'rejected';
+        else if (idx === STATE.currentStep) statusClass = 'current';
+
+        item.className = `edge-item ${statusClass}`;
+        item.innerHTML = `
+          <span>V${e.u} - V${e.v}</span>
+          <span><b>${e.weight}</b></span>
+        `;
+        container.appendChild(item);
+
+        if (idx === STATE.currentStep) {
+          item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      });
+    }
+
+    function logMessage(msg, type = 'info') {
+      const logList = document.getElementById('log-list');
+      const li = document.createElement('li');
+      li.className = `log-${type}`;
+      li.innerText = msg;
+      logList.appendChild(li);
+      logList.scrollTop = logList.scrollHeight;
+    }
+
+    // --- 9. 源码面板显示与隐藏控制 ---
+    function toggleSourceCodePanel() {
+      STATE.showCodePanel = !STATE.showCodePanel;
+      const codePanel = document.getElementById('panel-code');
+      const rightPanel = document.getElementById('panel-right');
+      const btn = document.getElementById('btn-toggle-code');
+
+      if (STATE.showCodePanel) {
+        codePanel.style.display = 'flex';
+        rightPanel.style.right = '400px'; // 边列表左移，留出最右侧空间放置源码面板
+        btn.classList.add('active');
+        btn.innerText = '💻 隐藏源码';
+      } else {
+        codePanel.style.display = 'none';
+        rightPanel.style.right = '20px'; // 边列表复位至右侧
+        btn.classList.remove('active');
+        btn.innerText = '💻 查看源码';
+      }
+    }
+
+    // --- 10. 自动播放控制 ---
+    function startAutoPlay() {
+      if (STATE.isPlaying) return;
+      STATE.isPlaying = true;
+      const btn = document.getElementById('btn-play');
+      btn.innerText = '暂停播放';
+      btn.classList.remove('primary');
+
+      STATE.timer = setInterval(() => {
+        const ok = stepAlgorithm();
+        if (!ok) stopAutoPlay();
+      }, STATE.speed);
+    }
+
+    function stopAutoPlay() {
+      STATE.isPlaying = false;
+      if (STATE.timer) clearInterval(STATE.timer);
+      STATE.timer = null;
+      const btn = document.getElementById('btn-play');
+      btn.innerText = '自动播放';
+      btn.classList.add('primary');
+    }
+
+    // --- 11. 事件监听与参数绑定 ---
+    function setupEventListeners() {
+      // 源码面板切换按钮绑定
+      document.getElementById('btn-toggle-code').addEventListener('click', toggleSourceCodePanel);
+      document.getElementById('btn-close-code').addEventListener('click', toggleSourceCodePanel);
+
+      // 控制按钮
+      document.getElementById('btn-play').addEventListener('click', () => {
+        if (STATE.isPlaying) stopAutoPlay();
+        else startAutoPlay();
+      });
+
+      document.getElementById('btn-step').addEventListener('click', () => {
+        stopAutoPlay();
+        stepAlgorithm();
+      });
+
+      document.getElementById('btn-reset-algo').addEventListener('click', resetAlgorithmState);
+      
+      document.getElementById('btn-reset-cam').addEventListener('click', () => {
+        camera.position.set(35, 25, 45);
+        controls.target.set(0, 0, 0);
+      });
+
+      document.getElementById('btn-clear-log').addEventListener('click', () => {
+        document.getElementById('log-list').innerHTML = '';
+      });
+
+      document.getElementById('btn-rebuild').addEventListener('click', buildGraph);
+
+      // 参数滑块与下拉框
+      document.getElementById('slider-speed').addEventListener('input', (e) => {
+        STATE.speed = parseInt(e.target.value);
+        document.getElementById('val-speed').innerText = `${(STATE.speed / 1000).toFixed(1)}s`;
+        if (STATE.isPlaying) {
+          stopAutoPlay();
+          startAutoPlay();
+        }
+      });
+
+      document.getElementById('slider-nodes').addEventListener('change', (e) => {
+        STATE.nodeCount = parseInt(e.target.value);
+        document.getElementById('val-nodes').innerText = STATE.nodeCount;
+        buildGraph();
+      });
+      document.getElementById('slider-nodes').addEventListener('input', (e) => {
+        document.getElementById('val-nodes').innerText = e.target.value;
+      });
+
+      document.getElementById('slider-density').addEventListener('change', (e) => {
+        STATE.density = parseInt(e.target.value);
+        const labels = ['稀疏', '中度', '稠密', '极高'];
+        document.getElementById('val-density').innerText = `${labels[STATE.density - 1]}`;
+        buildGraph();
+      });
+
+      document.getElementById('select-topology').addEventListener('change', (e) => {
+        STATE.topology = e.target.value;
+        buildGraph();
+      });
+
+      document.getElementById('slider-space').addEventListener('change', (e) => {
+        STATE.spaceSize = parseInt(e.target.value);
+        document.getElementById('val-space').innerText = STATE.spaceSize;
+        buildGraph();
+      });
+
+      // 视觉缩放调节
+      document.getElementById('slider-node-size').addEventListener('input', (e) => {
+        STATE.nodeScale = parseFloat(e.target.value);
+        document.getElementById('val-node-size').innerText = STATE.nodeScale.toFixed(1);
+        nodeMeshes.forEach(m => m.scale.set(STATE.nodeScale, STATE.nodeScale, STATE.nodeScale));
+      });
+
+      document.getElementById('slider-edge-size').addEventListener('input', (e) => {
+        STATE.edgeScale = parseFloat(e.target.value);
+        document.getElementById('val-edge-size').innerText = STATE.edgeScale.toFixed(1);
+        edgeMeshes.forEach(m => m.scale.set(STATE.edgeScale, 1, STATE.edgeScale));
+      });
+
+      document.getElementById('toggle-labels').addEventListener('change', (e) => {
+        STATE.showLabels = e.target.checked;
+        edgeLabels.forEach(l => l.visible = STATE.showLabels);
+      });
+
+      document.getElementById('toggle-autorotate').addEventListener('change', (e) => {
+        STATE.autoRotate = e.target.checked;
+        controls.autoRotate = STATE.autoRotate;
+        controls.autoRotateSpeed = 1.5;
+      });
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // --- 12. 主渲染循环 ---
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // 启动入口
+    window.onload = () => {
+      initThree();
+      setupEventListeners();
+      buildGraph();
+      animate();
+    };
+  </script>
+</body>
+</html>

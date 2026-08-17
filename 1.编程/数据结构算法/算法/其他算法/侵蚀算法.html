@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>水力侵蚀算法 · 3D 地形可视化</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#141c28; --panel2:#182234; --line:#26354b;
+  --txt:#d7e1ee; --dim:#8aa0b8; --accent:#2dd4bf; --accent2:#38bdf8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--txt);font-size:13px}
+#app{display:flex;height:100vh}
+/* ---------- 左侧控制台 ---------- */
+#panel{width:335px;min-width:335px;height:100%;overflow-y:auto;background:var(--panel);border-right:1px solid var(--line);padding:12px}
+#panel::-webkit-scrollbar{width:8px}
+#panel::-webkit-scrollbar-thumb{background:#2b3a52;border-radius:4px}
+h1{font-size:16px;font-weight:600;padding:4px 2px 2px;color:#fff}
+.subtitle{font-size:11px;color:var(--dim);padding:0 2px 10px}
+.section{border:1px solid var(--line);border-radius:10px;background:var(--panel2);margin-bottom:12px;overflow:hidden}
+.section>h2{font-size:12px;letter-spacing:1px;color:var(--accent2);padding:8px 12px;background:rgba(56,189,248,.08);border-bottom:1px solid var(--line)}
+.ctrl{padding:7px 12px}
+.ctrl-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px}
+.ctrl-label .val{color:var(--accent);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;height:18px;accent-color:var(--accent);cursor:pointer}
+input[type=number],select{width:100%;background:#0f1622;border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:5px 8px;font-size:12px;outline:none}
+input[type=number]:focus,select:focus{border-color:var(--accent)}
+input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;vertical-align:-2px;margin-right:6px}
+.check-row{padding:7px 12px;font-size:12px;cursor:pointer;display:block}
+.seed-row{display:flex;gap:6px;padding:7px 12px}
+.seed-row input{flex:1}
+.icon-btn{width:34px;background:#0f1622;border:1px solid var(--line);border-radius:6px;color:var(--txt);cursor:pointer;font-size:14px}
+.icon-btn:hover{border-color:var(--accent)}
+.btns{display:flex;flex-direction:column;gap:8px;padding:10px 12px 12px}
+button.act{border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;color:#04121a;background:linear-gradient(135deg,#2dd4bf,#38bdf8)}
+button.act:hover{filter:brightness(1.12)}
+button.act:disabled{opacity:.45;cursor:not-allowed}
+button.ghost{background:#0f1622;color:var(--txt);border:1px solid var(--line)}
+button.ghost:hover{border-color:var(--accent)}
+#progressWrap{height:8px;background:#0f1622;border-radius:4px;overflow:hidden;border:1px solid var(--line);margin:0 12px}
+#progressFill{height:100%;width:0;background:linear-gradient(90deg,#2dd4bf,#38bdf8);transition:width .1s}
+#status{font-size:11px;color:var(--dim);padding:6px 12px 10px;min-height:26px;line-height:1.5}
+.note{font-size:11px;color:var(--dim);line-height:1.6;padding:8px 12px}
+/* ---------- 右侧 3D 展示 ---------- */
+#viewport{flex:1;position:relative}
+#viewport canvas{display:block}
+.overlay{position:absolute;background:rgba(10,16,26,.72);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12px;backdrop-filter:blur(4px);pointer-events:none;z-index:5}
+#stats{right:12px;bottom:12px;line-height:1.7}
+#stats b{color:var(--accent);font-weight:600}
+#hint{left:12px;bottom:12px;color:var(--dim)}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- 左侧控制台 -->
+  <div id="panel">
+    <h1>🌊 水力侵蚀 · 3D 地形</h1>
+    <div class="subtitle">Hydraulic Erosion 3D Visualizer</div>
+
+    <div class="section"><h2>⛰ 地形生成</h2>
+      <div id="grp-terrain"></div>
+      <div class="note">修改本组参数后，需点击「生成新地形」生效。</div>
+    </div>
+
+    <div class="section"><h2>💧 侵蚀参数</h2>
+      <div id="grp-erosion"></div>
+    </div>
+
+    <div class="section"><h2>🎨 显示设置</h2>
+      <div id="grp-display"></div>
+    </div>
+
+    <div class="section"><h2>🚀 操作</h2>
+      <div class="btns">
+        <button class="act" id="btn-gen">⛰ 生成新地形</button>
+        <button class="act" id="btn-erode">🌊 运行侵蚀</button>
+        <button class="ghost" id="btn-reset">↺ 恢复原始地形</button>
+      </div>
+      <div id="progressWrap"><div id="progressFill"></div></div>
+      <div id="status">就绪</div>
+    </div>
+
+    <div class="note">
+      <b style="color:#8aa0b8">算法说明：</b>每个水滴随机落在地形上，沿梯度下降并加速；
+      根据速度×水量×坡度计算泥沙容量，容量不足时侵蚀地表，过剩或爬坡时沉积泥沙，
+      同时水分不断蒸发。数万水滴迭代后自然形成河谷、沟壑与冲积扇。
+    </div>
+  </div>
+
+  <!-- 右侧展示界面 -->
+  <div id="viewport">
+    <div class="overlay" id="hint">🖱 左键旋转 · 滚轮缩放 · 右键平移</div>
+    <div class="overlay" id="stats"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+/* ============================================================
+ * 1. 工具：确定性随机数 + Perlin 噪声
+ * ============================================================ */
+function mulberry32(a){
+  return function(){
+    a|=0; a=a+0x6D2B79F5|0;
+    let t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+class Perlin{
+  constructor(seed){
+    const p=new Uint8Array(256), rng=mulberry32(seed);
+    for(let i=0;i<256;i++) p[i]=i;
+    for(let i=255;i>0;i--){ const j=(rng()*(i+1))|0; const t=p[i];p[i]=p[j];p[j]=t; }
+    this.perm=new Uint8Array(512);
+    for(let i=0;i<512;i++) this.perm[i]=p[i&255];
+  }
+  fade(t){return t*t*t*(t*(t*6-15)+10);}
+  grad(h,x,y){
+    switch(h&7){
+      case 0:return x+y; case 1:return x-y; case 2:return -x+y; case 3:return -x-y;
+      case 4:return x;   case 5:return -x;  case 6:return y;    default:return -y;
+    }
+  }
+  noise(x,y){
+    const X=Math.floor(x)&255, Y=Math.floor(y)&255;
+    x-=Math.floor(x); y-=Math.floor(y);
+    const u=this.fade(x), v=this.fade(y), P=this.perm;
+    const a=P[X]+Y, b=P[X+1]+Y;
+    const l=(s,t,q)=>s+(t-s)*q;
+    return l(
+      l(this.grad(P[a],x,y),     this.grad(P[b],x-1,y),u),
+      l(this.grad(P[a+1],x,y-1), this.grad(P[b+1],x-1,y-1),u), v);
+  }
+}
+let perlin=null;
+function fbm(x,y,oct,pers,lac){
+  let amp=1,freq=1,total=0,max=0;
+  for(let i=0;i<oct;i++){
+    total+=perlin.noise(x*freq,y*freq)*amp;
+    max+=amp; amp*=pers; freq*=lac;
+  }
+  return total/max; // -1 ~ 1
+}
+
+/* ============================================================
+ * 2. 参数与控制台 UI
+ * ============================================================ */
+const params={ seed:1337, mapSize:256, colorMode:'terrain',
+  wireframe:false, showWater:false, autorotate:false, freshStart:true };
+
+const CFG={
+  terrain:[
+    {k:'noiseScale', label:'噪声缩放',   min:5,  max:120, step:1,   v:28,  dec:0},
+    {k:'octaves',    label:'倍频程数',   min:1,  max:8,   step:1,   v:5,   dec:0},
+    {k:'persistence',label:'持续度',     min:.1, max:.9,  step:.01, v:.5,  dec:2},
+    {k:'lacunarity', label:'粗糙度',     min:1,  max:4,   step:.05, v:2,   dec:2},
+    {k:'amplitude',  label:'地形起伏',   min:1,  max:20,  step:.5,  v:8,   dec:1},
+  ],
+  erosion:[
+    {k:'droplets',   label:'水滴数量',   min:1000,max:200000,step:1000,v:60000,dec:0},
+    {k:'lifetime',   label:'水滴寿命',   min:5,  max:100, step:1,   v:30,  dec:0},
+    {k:'inertia',    label:'惯性',       min:0,  max:1,   step:.01, v:.05, dec:2},
+    {k:'capacity',   label:'泥沙容量系数',min:0, max:8,   step:.1,  v:4,   dec:1},
+    {k:'minCap',     label:'最小泥沙容量',min:0, max:.1,  step:.005,v:.01, dec:3},
+    {k:'deposit',    label:'沉积速度',   min:0,  max:1,   step:.01, v:.3,  dec:2},
+    {k:'erode',      label:'侵蚀速度',   min:0,  max:1,   step:.01, v:.3,  dec:2},
+    {k:'evaporate',  label:'蒸发速度',   min:.001,max:.2, step:.001,v:.01, dec:3},
+    {k:'gravity',    label:'重力',       min:0,  max:10,  step:.1,  v:4,   dec:1},
+    {k:'initSpeed',  label:'初始速度',   min:0,  max:5,   step:.1,  v:1,   dec:1},
+    {k:'initWater',  label:'初始水量',   min:0,  max:5,   step:.1,  v:1,   dec:1},
+    {k:'brushRadius',label:'侵蚀笔刷半径',min:1, max:8,   step:1,   v:3,   dec:0},
+  ],
+  display:[
+    {k:'meshHeight', label:'显示高度',   min:2,  max:40,  step:1,   v:14,  dec:0},
+    {k:'waterLevel', label:'水位',       min:0,  max:1,   step:.01, v:.25, dec:2},
+  ]
+};
+
+function sliderRow(c, onChange){
+  params[c.k]=c.v;
+  const wrap=document.createElement('div'); wrap.className='ctrl';
+  const lab=document.createElement('div'); lab.className='ctrl-label';
+  const val=document.createElement('span'); val.className='val';
+  val.textContent=c.v.toFixed(c.dec);
+  lab.innerHTML=`<span>${c.label}</span>`; lab.appendChild(val);
+  const inp=document.createElement('input');
+  inp.type='range'; inp.min=c.min; inp.max=c.max; inp.step=c.step; inp.value=c.v;
+  inp.oninput=()=>{ params[c.k]=parseFloat(inp.value); val.textContent=params[c.k].toFixed(c.dec); onChange&&onChange(); };
+  wrap.appendChild(lab); wrap.appendChild(inp);
+  return wrap;
+}
+function checkRow(label,key,onChange){
+  const l=document.createElement('label'); l.className='check-row';
+  const c=document.createElement('input'); c.type='checkbox'; c.checked=params[key];
+  c.onchange=()=>{ params[key]=c.checked; onChange&&onChange(); };
+  l.appendChild(c); l.appendChild(document.createTextNode(label));
+  return l;
+}
+function buildUI(){
+  const gT=document.getElementById('grp-terrain');
+  // 种子行
+  const sr=document.createElement('div'); sr.className='seed-row';
+  const seedInp=document.createElement('input'); seedInp.type='number'; seedInp.value=params.seed;
+  seedInp.onchange=()=>params.seed=parseInt(seedInp.value)||0;
+  const dice=document.createElement('button'); dice.className='icon-btn'; dice.textContent='🎲'; dice.title='随机种子';
+  dice.onclick=()=>{ params.seed=(Math.random()*1e6)|0; seedInp.value=params.seed; };
+  sr.appendChild(seedInp); sr.appendChild(dice); gT.appendChild(sr);
+  // 分辨率
+  const resWrap=document.createElement('div'); resWrap.className='ctrl';
+  resWrap.innerHTML='<div class="ctrl-label"><span>网格分辨率</span></div>';
+  const sel=document.createElement('select');
+  [128,192,256,320,384,512].forEach(v=>{ const o=document.createElement('option'); o.value=v;o.textContent=v+' × '+v; if(v===256)o.selected=true; sel.appendChild(o); });
+  sel.onchange=()=>params.mapSize=parseInt(sel.value);
+  resWrap.appendChild(sel); gT.appendChild(resWrap);
+  CFG.terrain.forEach(c=>gT.appendChild(sliderRow(c)));
+
+  const gE=document.getElementById('grp-erosion');
+  CFG.erosion.forEach(c=>gE.appendChild(sliderRow(c)));
+  gE.appendChild(checkRow('每次从原始地形开始','freshStart'));
+
+  const gD=document.getElementById('grp-display');
+  const cmWrap=document.createElement('div'); cmWrap.className='ctrl';
+  cmWrap.innerHTML='<div class="ctrl-label"><span>着色模式</span></div>';
+  const cm=document.createElement('select');
+  [['terrain','地形配色'],['gray','高度灰度'],['slope','坡度分析']].forEach(([v,t])=>{
+    const o=document.createElement('option'); o.value=v; o.textContent=t; cm.appendChild(o);
+  });
+  cm.onchange=()=>{ params.colorMode=cm.value; updateMesh(); };
+  cmWrap.appendChild(cm); gD.appendChild(cmWrap);
+  CFG.display.forEach(c=>gD.appendChild(sliderRow(c,()=>updateMesh())));
+  gD.appendChild(checkRow('显示水面','showWater',()=>updateMesh()));
+  gD.appendChild(checkRow('线框模式','wireframe',()=>updateMesh()));
+  gD.appendChild(checkRow('自动旋转','autorotate',()=>{ controls.autoRotate=params.autorotate; }));
+}
+
+/* ============================================================
+ * 3. 地形生成
+ * ============================================================ */
+let base=null, working=null, curSize=256;
+function generateTerrain(){
+  const size=params.mapSize; curSize=size;
+  perlin=new Perlin(params.seed>>>0);
+  base=new Float32Array(size*size);
+  const ns=params.noiseScale, oct=params.octaves|0, per=params.persistence,
+        lac=params.lacunarity, amp=params.amplitude;
+  for(let y=0;y<size;y++){
+    const ny=y/size*ns;
+    for(let x=0;x<size;x++){
+      base[y*size+x]=(fbm(x/size*ns,ny,oct,per,lac)*0.5+0.5)*amp;
+    }
+  }
+  working=base.slice();
+  erosionRuns=0;
+  rebuildGeometry(); updateMesh(); updateStats();
+  setStatus('✅ 已生成新地形（未侵蚀），点击「运行侵蚀」开始');
+}
+
+/* ============================================================
+ * 4. 水力侵蚀核心（水滴模拟）
+ * ============================================================ */
+let bOffsets=null, bWeights=null, bCount=0;
+function buildBrush(r,size){
+  const offs=[],ws=[]; let sum=0;
+  for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+    const d=Math.sqrt(dx*dx+dy*dy);
+    if(d<=r){ const w=r-d; if(w>0){offs.push(dy*size+dx); ws.push(w); sum+=w;} }
+  }
+  bCount=offs.length;
+  bOffsets=new Int32Array(offs);
+  bWeights=new Float32Array(ws.map(w=>w/sum));
+}
+function erodeCore(map,size,rng,P,n,margin){
+  const {lifetime,inertia,capacity,minCap,deposit,erode,evaporate,gravity,initSpeed,initWater}=P;
+  const spawn=size-1-margin*2;
+  for(let d=0;d<n;d++){
+    let posX=margin+rng()*spawn, posY=margin+rng()*spawn;
+    let dirX=0,dirY=0,speed=initSpeed,water=initWater,sediment=0;
+    for(let life=0;life<lifetime;life++){
+      const nodeX=posX|0, nodeY=posY|0, idx=nodeY*size+nodeX;
+      const cx=posX-nodeX, cy=posY-nodeY;
+      const h00=map[idx],h10=map[idx+1],h01=map[idx+size],h11=map[idx+size+1];
+      // 双线性梯度与高度
+      const gX=(h10-h00)*(1-cy)+(h11-h01)*cy;
+      const gY=(h01-h00)*(1-cx)+(h11-h10)*cx;
+      const height=h00*(1-cx)*(1-cy)+h10*cx*(1-cy)+h01*(1-cx)*cy+h11*cx*cy;
+      // 方向 = 惯性 × 旧方向 - 梯度
+      dirX=dirX*inertia-gX*(1-inertia);
+      dirY=dirY*inertia-gY*(1-inertia);
+      const len=Math.sqrt(dirX*dirX+dirY*dirY);
+      if(len<=1e-8){ const a=rng()*6.2832; dirX=Math.cos(a); dirY=Math.sin(a); }
+      else{ dirX/=len; dirY/=len; }
+      posX+=dirX; posY+=dirY;
+      if(posX<margin||posX>=size-1-margin||posY<margin||posY>=size-1-margin) break;
+      // 新位置高度
+      const nx=posX|0,ny=posY|0,i2=ny*size+nx,fx=posX-nx,fy=posY-ny;
+      const newH=map[i2]*(1-fx)*(1-fy)+map[i2+1]*fx*(1-fy)+map[i2+size]*(1-fx)*fy+map[i2+size+1]*fx*fy;
+      const dH=newH-height;
+      const cap=Math.max(-dH*speed*water*capacity,minCap);
+      if(sediment>cap||dH>0){
+        // ---- 沉积 ----
+        const amt=dH>0?Math.min(dH,sediment):(sediment-cap)*deposit;
+        sediment-=amt;
+        map[idx]      +=amt*(1-cx)*(1-cy);
+        map[idx+1]    +=amt*cx*(1-cy);
+        map[idx+size] +=amt*(1-cx)*cy;
+        map[idx+size+1]+=amt*cx*cy;
+      }else{
+        // ---- 侵蚀（笔刷范围内按权重分配）----
+        const amt=Math.min((cap-sediment)*erode,-dH);
+        for(let b=0;b<bCount;b++){
+          const bi=idx+bOffsets[b];
+          const w=amt*bWeights[b];
+          const ds=map[bi]<w?map[bi]:w;
+          map[bi]-=ds; sediment+=ds;
+        }
+      }
+      // 加速 / 蒸发
+      speed=Math.sqrt(Math.max(0,speed*speed-dH*gravity));
+      water*=(1-evaporate);
+    }
+  }
+}
+
+/* ============================================================
+ * 5. Three.js 场景
+ * ============================================================ */
+let renderer,scene,camera,controls,mesh=null,geo=null,material=null,water;
+const WORLD=100;
+function initThree(){
+  const vp=document.getElementById('viewport');
+  renderer=new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(vp.clientWidth,vp.clientHeight);
+  vp.appendChild(renderer.domElement);
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x0b1020);
+  scene.fog=new THREE.Fog(0x0b1020,220,520);
+  camera=new THREE.PerspectiveCamera(50,vp.clientWidth/vp.clientHeight,0.1,2000);
+  camera.position.set(85,68,85);
+  controls=new THREE.OrbitControls(camera,renderer.domElement);
+  controls.target.set(0,6,0);
+  controls.enableDamping=true; controls.dampingFactor=0.08;
+  controls.maxPolarAngle=Math.PI*0.495;
+  controls.minDistance=20; controls.maxDistance=500;
+  controls.autoRotateSpeed=1.2;
+  scene.add(new THREE.HemisphereLight(0xbfd7ea,0x1a202c,0.95));
+  const dir=new THREE.DirectionalLight(0xffffff,0.85);
+  dir.position.set(60,100,40); scene.add(dir);
+  water=new THREE.Mesh(
+    new THREE.PlaneGeometry(WORLD*2.4,WORLD*2.4),
+    new THREE.MeshPhongMaterial({color:0x2e6f9e,transparent:true,opacity:0.55,shininess:120,specular:0x99ccff})
+  );
+  water.rotation.x=-Math.PI/2; water.visible=false; scene.add(water);
+  window.addEventListener('resize',()=>{
+    camera.aspect=vp.clientWidth/vp.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(vp.clientWidth,vp.clientHeight);
+  });
+  (function loop(){ requestAnimationFrame(loop); controls.update(); renderer.render(scene,camera); })();
+}
+function rebuildGeometry(){
+  const size=curSize;
+  if(mesh){ scene.remove(mesh); geo.dispose(); }
+  geo=new THREE.BufferGeometry();
+  const n=size*size, pos=new Float32Array(n*3), col=new Float32Array(n*3);
+  const step=WORLD/(size-1); let p=0;
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+    pos[p++]=-WORLD/2+x*step; pos[p++]=0; pos[p++]=-WORLD/2+y*step;
+  }
+  const idx=new Uint32Array((size-1)*(size-1)*6); let q=0;
+  for(let y=0;y<size-1;y++)for(let x=0;x<size-1;x++){
+    const a=y*size+x,b=a+1,c=a+size,d=c+1;
+    idx[q++]=a;idx[q++]=d;idx[q++]=b; idx[q++]=a;idx[q++]=c;idx[q++]=d;
+  }
+  geo.setIndex(new THREE.BufferAttribute(idx,1));
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+  if(!material) material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0});
+  mesh=new THREE.Mesh(geo,material);
+  scene.add(mesh);
+}
+/* ---- 配色 ---- */
+const RAMP=[[0,[23,52,82]],[.16,[44,94,122]],[.22,[201,178,128]],[.30,[126,176,102]],
+            [.52,[74,118,66]],[.70,[128,132,140]],[.86,[236,240,243]],[1,[255,255,255]]];
+function ramp(t){
+  for(let i=0;i<RAMP.length-1;i++){
+    const [t0,c0]=RAMP[i],[t1,c1]=RAMP[i+1];
+    if(t<=t1){ const k=(t-t0)/Math.max(1e-6,t1-t0);
+      return [c0[0]+(c1[0]-c0[0])*k, c0[1]+(c1[1]-c0[1])*k, c0[2]+(c1[2]-c0[2])*k]; }
+  }
+  return [255,255,255];
+}
+function smoothstep(a,b,x){ x=Math.min(1,Math.max(0,(x-a)/(b-a))); return x*x*(3-2*x); }
+function terrainColor(h,slope){
+  let [r,g,b]=ramp(h);
+  const t=smoothstep(0.25,0.55,slope)*0.85; // 陡坡 → 岩石灰
+  return [r+(122-r)*t, g+(124-g)*t, b+(130-b)*t];
+}
+function slopeColor(s){
+  const t=Math.min(1,s*2.2);
+  if(t<0.5){ const k=t*2; return [52+(240-52)*k,160+(210-160)*k,120+(80-120)*k]; }
+  const k=(t-0.5)*2; return [240+(215-240)*k,210+(70-210)*k,80+(50-80)*k];
+}
+function updateMesh(){
+  if(!geo) return;
+  const size=curSize, pos=geo.attributes.position.array, col=geo.attributes.color.array;
+  let min=Infinity,max=-Infinity;
+  for(let i=0;i<size*size;i++){ const h=working[i]; if(h<min)min=h; if(h>max)max=h; }
+  const range=Math.max(1e-6,max-min), mh=params.meshHeight;
+  for(let i=0;i<size*size;i++) pos[3*i+1]=((working[i]-min)/range)*mh;
+  geo.attributes.position.needsUpdate=true;
+  geo.computeVertexNormals();
+  const nrm=geo.attributes.normal.array;
+  for(let i=0;i<size*size;i++){
+    const h=(working[i]-min)/range, slope=1-nrm[3*i+1];
+    let c;
+    if(params.colorMode==='gray'){ const v=30+h*225; c=[v,v,v]; }
+    else if(params.colorMode==='slope') c=slopeColor(slope);
+    else c=terrainColor(h,slope);
+    col[3*i]=c[0]/255; col[3*i+1]=c[1]/255; col[3*i+2]=c[2]/255;
+  }
+  geo.attributes.color.needsUpdate=true;
+  water.visible=params.showWater;
+  water.position.y=params.waterLevel*mh;
+  material.wireframe=params.wireframe;
+}
+
+/* ============================================================
+ * 6. 运行控制（分批执行 + 进度条，避免卡顿）
+ * ============================================================ */
+let running=false, erosionRuns=0, dropsTotal=0, lastTime=null;
+const progressFill=document.getElementById('progressFill');
+const statusEl=document.getElementById('status');
+const statsEl=document.getElementById('stats');
+function setStatus(t){ statusEl.textContent=t; }
+function updateStats(){
+  statsEl.innerHTML=
+    `顶点数 <b>${(curSize*curSize).toLocaleString()}</b> · 累计水滴 <b>${dropsTotal.toLocaleString()}</b><br>`+
+    `侵蚀轮次 <b>${erosionRuns}</b> · 上次耗时 <b>${lastTime===null?'—':lastTime+' s'}</b>`;
+}
+function setButtons(dis){
+  document.getElementById('btn-gen').disabled=dis;
+  document.getElementById('btn-erode').disabled=dis;
+  document.getElementById('btn-reset').disabled=dis;
+}
+function runErosion(){
+  if(running) return;
+  running=true; setButtons(true);
+  if(params.freshStart) working=base.slice();
+  const size=curSize;
+  const margin=Math.min(params.brushRadius,Math.floor((size-3)/2));
+  buildBrush(params.brushRadius,size);
+  const rng=mulberry32(((params.seed*2654435761)^((erosionRuns+1)*97))>>>0);
+  const P={lifetime:params.lifetime|0,inertia:params.inertia,capacity:params.capacity,
+    minCap:params.minCap,deposit:params.deposit,erode:params.erode,evaporate:params.evaporate,
+    gravity:params.gravity,initSpeed:params.initSpeed,initWater:params.initWater};
+  const total=params.droplets|0, batch=Math.max(500,Math.round(total/60));
+  let done=0; const t0=performance.now();
+  (function step(){
+    const n=Math.min(batch,total-done);
+    erodeCore(working,size,rng,P,n,margin);
+    done+=n;
+    const pct=Math.round(done/total*100);
+    progressFill.style.width=pct+'%';
+    setStatus(`🌊 侵蚀中… ${done.toLocaleString()} / ${total.toLocaleString()} 水滴 (${pct}%)`);
+    if(done<total){ setTimeout(step,0); return; }
+    lastTime=((performance.now()-t0)/1000).toFixed(2);
+    erosionRuns++; dropsTotal+=total;
+    updateMesh(); updateStats();
+    running=false; setButtons(false);
+    setStatus(`✅ 侵蚀完成，耗时 ${lastTime} s（第 ${erosionRuns} 轮）`);
+    setTimeout(()=>progressFill.style.width='0%',1200);
+  })();
+}
+
+/* ============================================================
+ * 7. 启动
+ * ============================================================ */
+buildUI();
+initThree();
+document.getElementById('btn-gen').onclick=generateTerrain;
+document.getElementById('btn-erode').onclick=runErosion;
+document.getElementById('btn-reset').onclick=()=>{
+  if(running) return;
+  working=base.slice(); erosionRuns=0;
+  updateMesh(); updateStats(); setStatus('↺ 已恢复原始地形');
+};
+generateTerrain();
+</script>
+</body>
+</html>

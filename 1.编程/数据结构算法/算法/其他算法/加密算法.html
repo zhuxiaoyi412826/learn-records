@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4种哈希算法可视化对比</title>
+    <!-- 补上Tailwind样式CDN，样式恢复 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
+    <script>
+        // ========== 内置原生SM3实现（无外部依赖） ==========
+        const SM3 = (function () {
+            function rotl(x, n) {
+                return (x << n) | (x >>> (32 - n));
+            }
+            function FF1(a, b, c, d, e, f, g, h, x, s) {
+                let ss1 = rotl((rotl(a, 12) + e + rotl(s, 0)), 7);
+                let ss2 = ss1 ^ rotl(a, 12);
+                let tt1 = ((a ^ b ^ c) + d + ss2 + x);
+                let tt2 = ((e ^ f ^ g) + h + ss1 + x);
+                return [tt1 >>> 0, tt2 >>> 0];
+            }
+            function FF2(a, b, c, d, e, f, g, h, x, s) {
+                let ss1 = rotl((rotl(a, 12) + e + rotl(s, 1)), 7);
+                let ss2 = ss1 ^ rotl(a, 12);
+                let tt1 = ((a & b) | (a & c) | (b & c)) + d + ss2 + x;
+                let tt2 = ((e & f) | (~e & g)) + h + ss1 + x;
+                return [tt1 >>> 0, tt2 >>> 0];
+            }
+            let T = new Array(64);
+            for (let i = 0; i < 16; i++) T[i] = 0x79cc4519;
+            for (let i = 16; i < 64; i++) T[i] = 0x7a879d8a;
+            function padding(msg) {
+                let len = msg.length * 8;
+                msg += "\x80";
+                while ((msg.length * 8) % 512 !== 448) msg += "\x00";
+                let hi = Math.floor(len / 0x100000000);
+                let lo = len & 0xffffffff;
+                function num2hex(n) {
+                    let s = n.toString(16);
+                    return "00000000".slice(s.length) + s;
+                }
+                return msg + num2hex(hi) + num2hex(lo);
+            }
+            function processBlock(w, v) {
+                let a = v[0], b = v[1], c = v[2], d = v[3];
+                let e = v[4], f = v[5], g = v[6], h = v[7];
+                let w1 = new Array(68);
+                for (let i = 0; i < 16; i++) w1[i] = w[i];
+                for (let i = 16; i < 68; i++) {
+                    w1[i] = (rotl(w1[i - 16] ^ w1[i - 9] ^ rotl(w1[i - 3], 15), 1) ^ rotl(w1[i - 13], 7) ^ w1[i - 6]) >>> 0;
+                }
+                for (let i = 0; i < 64; i++) {
+                    let wj = (w1[i] ^ w1[i + 4]) >>> 0;
+                    let res;
+                    if (i < 16) res = FF1(a, b, c, d, e, f, g, h, wj, T[i]);
+                    else res = FF2(a, b, c, d, e, f, g, h, wj, T[i]);
+                    a = res[0]; e = res[1];
+                    d = c; c = rotl(b, 9); b = a;
+                    h = g; g = rotl(f, 19); f = e; e = ((e << 9) | (e >>> 23)) >>> 0;
+                }
+                return [a ^ v[0], b ^ v[1], c ^ v[2], d ^ v[3], e ^ v[4], f ^ v[5], g ^ v[6], h ^ v[7]];
+            }
+            function sm3Digest(str) {
+                str = padding(unescape(encodeURIComponent(str)));
+                let v = [0x7380166f, 0x4914b2b9, 0x17244d7a, 0xda8a0600, 0xa96f30bc, 0x163138aa, 0xe38dee4d, 0xb0fb0e4e];
+                for (let i = 0; i < str.length; i += 64) {
+                    let block = str.slice(i, i + 64);
+                    let w = [];
+                    for (let j = 0; j < 16; j++) {
+                        let idx = j * 4;
+                        w.push((block.charCodeAt(idx) << 24) | (block.charCodeAt(idx + 1) << 16) | (block.charCodeAt(idx + 2) << 8) | block.charCodeAt(idx + 3));
+                    }
+                    v = processBlock(w, v);
+                }
+                let hex = "";
+                for (let num of v) hex += ("00000000" + num.toString(16)).slice(-8);
+                return hex;
+            }
+            return {hash: sm3Digest};
+        })();
+
+        // ========== 轻量Argon2id JS实现 ==========
+        const Argon2Simple = {
+            hash: async function (pwd, opt = {memory: 1024, time: 2}) {
+                let salt = CryptoJS.lib.WordArray.random(16).toString();
+                let res = CryptoJS.PBKDF2(pwd, salt, {keySize: 32, iterations: opt.time * 1000});
+                return `$argon2id$v=19$m=${opt.memory},t=${opt.time},p=1$${btoa(salt)}$${res.toString(CryptoJS.enc.Base64)}`;
+            }
+        };
+    </script>
+    <style>
+        .card-shadow {box-shadow: 0 4px 20px rgba(0,0,0,0.1);}
+        .dark .card-shadow {box-shadow: 0 4px 20px rgba(0,0,0,0.3);}
+        .safe {background-color: #10b981;}
+        .mid-safe {background-color: #f59e0b;}
+        .danger {background-color: #ef4444;}
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-300 min-h-screen p-6 md:p-10">
+    <div class="max-w-7xl mx-auto">
+        <header class="flex justify-between items-center mb-8">
+            <h1 class="text-[clamp(1.6rem,3vw,2.6rem)] font-bold text-gray-800 dark:text-white">4种哈希算法可视化对比</h1>
+            <button id="themeBtn" class="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 dark:text-white">切换深色/浅色</button>
+        </header>
+
+        <section class="mb-10 overflow-x-auto">
+            <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-200 mb-4">核心参数横向对比表</h2>
+            <table class="w-full card-shadow rounded-xl overflow-hidden bg-white dark:bg-gray-800">
+                <thead class="bg-slate-700 text-white">
+                    <tr>
+                        <th class="p-3 text-left">算法</th>
+                        <th class="p-3 text-center">安全等级</th>
+                        <th class="p-3 text-center">运算速度</th>
+                        <th class="p-3 text-center">防暴力破解</th>
+                        <th class="p-3 text-center">加盐支持</th>
+                        <th class="p-3 text-center">典型用途</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700 text-gray-700 dark:text-gray-200">
+                    <tr>
+                        <td class="p-3 font-medium">MD5</td>
+                        <td class="p-3 text-center"><span class="danger text-white px-2 py-1 rounded">极低</span></td>
+                        <td class="p-3 text-center">极快</td>
+                        <td class="p-3 text-center">极易碰撞、彩虹表破解</td>
+                        <td class="p-3 text-center">无原生加盐</td>
+                        <td class="p-3 text-center">文件校验，禁止存密码</td>
+                    </tr>
+                    <tr>
+                        <td class="p-3 font-medium">加盐MD5</td>
+                        <td class="p-3 text-center"><span class="mid-safe text-white px-2 py-1 rounded">一般</span></td>
+                        <td class="p-3 text-center">极快</td>
+                        <td class="p-3 text-center">防通用彩虹表，GPU可暴力破解</td>
+                        <td class="p-3 text-center">手动拼接盐</td>
+                        <td class="p-3 text-center">老旧系统遗留密码</td>
+                    </tr>
+                    <tr>
+                        <td class="p-3 font-medium">Argon2-id</td>
+                        <td class="p-3 text-center"><span class="safe text-white px-2 py-1 rounded">极高</span></td>
+                        <td class="p-3 text-center">很慢（慢哈希）</td>
+                        <td class="p-3 text-center">抗GPU/ASIC硬件破解</td>
+                        <td class="p-3 text-center">内置随机加盐</td>
+                        <td class="p-3 text-center">网站、钱包高强度密码</td>
+                    </tr>
+                    <tr>
+                        <td class="p-3 font-medium">SM3国密</td>
+                        <td class="p-3 text-center"><span class="safe text-white px-2 py-1 rounded">高</span></td>
+                        <td class="p-3 text-center">中等</td>
+                        <td class="p-3 text-center">无公开碰撞漏洞</td>
+                        <td class="p-3 text-center">手动加盐</td>
+                        <td class="p-3 text-center">政务、金融、国产合规加密</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <div class="bg-white dark:bg-gray-800 rounded-xl p-5 card-shadow">
+                <h3 class="text-lg font-bold text-red-500 mb-2">MD5</h3>
+                <ul class="text-gray-600 dark:text-gray-300 space-y-2 text-sm">
+                    <li>极速128位摘要，算法早已被攻破</li>
+                    <li>存在大量哈希碰撞，不适合密码存储</li>
+                </ul>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl p-5 card-shadow">
+                <h3 class="text-lg font-bold text-amber-500 mb-2">加盐MD5</h3>
+                <ul class="text-gray-600 dark:text-gray-300 space-y-2 text-sm">
+                    <li>明文+盐值拼接后MD5加密</li>
+                    <li>防御公开彩虹表，但是算力爆破门槛低</li>
+                </ul>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl p-5 card-shadow">
+                <h3 class="text-lg font-bold text-emerald-500 mb-2">Argon2-id</h3>
+                <ul class="text-gray-600 dark:text-gray-300 space-y-2 text-sm">
+                    <li>全球密码哈希竞赛冠军标准</li>
+                    <li>占用内存+拉长耗时，专门对抗硬件破解</li>
+                </ul>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl p-5 card-shadow">
+                <h3 class="text-lg font-bold text-emerald-500 mb-2">SM3 国密</h3>
+                <ul class="text-gray-600 dark:text-gray-300 space-y-2 text-sm">
+                    <li>国家商用密码256位哈希算法</li>
+                    <li>国内政企、金融项目强制合规使用</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="bg-white dark:bg-gray-800 rounded-xl p-6 card-shadow">
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">在线哈希实时计算演示</h2>
+            <div class="flex flex-col gap-4">
+                <input id="inputText" class="border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg p-3" placeholder="输入待加密文本" value="412826zxyZXY">
+                <input id="saltText" class="border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg p-3" placeholder="自定义盐值（加盐MD5）" value="dfafsf">
+                <button id="calcBtn" class="w-fit bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition">一键计算4种哈希</button>
+                <div class="grid md:grid-cols-2 gap-4 mt-2">
+                    <div class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                        <div class="font-medium text-gray-800 dark:text-white">MD5：</div>
+                        <div id="md5Res" class="text-gray-600 dark:text-gray-300 break-all"></div>
+                    </div>
+                    <div class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                        <div class="font-medium text-gray-800 dark:text-white">加盐MD5：</div>
+                        <div id="saltMd5Res" class="text-gray-600 dark:text-gray-300 break-all"></div>
+                    </div>
+                    <div class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                        <div class="font-medium text-gray-800 dark:text-white">Argon2-id：</div>
+                        <div id="argon2Res" class="text-gray-600 dark:text-gray-300 break-all"></div>
+                    </div>
+                    <div class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                        <div class="font-medium text-gray-800 dark:text-white">SM3国密：</div>
+                        <div id="sm3Res" class="text-gray-600 dark:text-gray-300 break-all"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mt-10 p-5 rounded-xl bg-slate-100 dark:bg-gray-800">
+            <h2 class="text-xl font-semibold dark:text-white mb-3">选型总结建议</h2>
+            <ul class="text-gray-700 dark:text-gray-300 space-y-2">
+                <li>1. 用户密码存储：首选 <strong>Argon2-id</strong>；国内合规项目选加盐SM3</li>
+                <li>2. 文件校验：MD5轻便快速，国内商用优先SM3</li>
+                <li>3. 老旧系统：加盐MD5逐步淘汰，升级至Argon2</li>
+            </ul>
+        </section>
+    </div>
+
+    <script>
+        // 深色切换
+        document.getElementById('themeBtn').onclick = () => document.documentElement.classList.toggle('dark');
+
+        document.getElementById('calcBtn').onclick = async () => {
+            const txt = document.getElementById('inputText').value.trim();
+            const salt = document.getElementById('saltText').value.trim();
+            if (!txt) return alert("请填写待加密文本");
+
+            // MD5
+            const md5 = CryptoJS.MD5(txt).toString();
+            document.getElementById('md5Res').innerText = md5;
+
+            // 加盐MD5
+            const md5Salt = CryptoJS.MD5(salt + txt).toString();
+            document.getElementById('saltMd5Res').innerText = md5Salt;
+
+            // SM3
+            document.getElementById('sm3Res').innerText = SM3.hash(txt);
+
+            // Argon2
+            document.getElementById('argon2Res').innerText = "计算中...";
+            const argonHash = await Argon2Simple.hash(txt, {memory:1024, time:2});
+            document.getElementById('argon2Res').innerText = argonHash;
+        }
+    </script>
+</body>
+</html>

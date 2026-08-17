@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Dijkstra 可视化算法</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: #f5f5fa;
+        }
+        /* 顶部工具栏 */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #eeeef5;
+            border-bottom: 1px solid #ccc;
+            flex-wrap: wrap;
+        }
+        .toolbar button, .toolbar select, .toolbar input {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .btn-play { background: #32a852; color: white; }
+        .btn-pause { background: #c89632; color: white; }
+        .btn-step { background: #3264c8; color: white; }
+        .btn-reset { background: #c83232; color: white; }
+        .btn-mode { background: #666; color: white; }
+        .btn-mode.active { background: #222; }
+        /* 主体布局 */
+        .main-wrap {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        /* 绘图画布 */
+        #canvasBox {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        #graphCanvas {
+            background: #f5f5fa;
+            display: block;
+        }
+        /* 右侧信息面板 */
+        .info-panel {
+            width: 320px;
+            border-left: 1px solid #ccc;
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+        }
+        .step-info {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .step-title {
+            font-size: 18px;
+            color: #2244aa;
+            text-align: center;
+            font-weight: bold;
+        }
+        .step-desc {
+            font-size: 13px;
+            color: #444;
+            margin: 6px 0;
+            text-align: center;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 14px;
+            background: #ddd;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .progress-inner {
+            height: 100%;
+            background: #4285f4;
+            width: 0%;
+            transition: 0.2s;
+        }
+        /* 距离表格 */
+        .table-wrap {
+            flex: 1;
+            overflow: auto;
+            border-bottom: 1px solid #eee;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        th, td {
+            border: 1px solid #eee;
+            padding: 6px;
+            text-align: center;
+        }
+        th {
+            background: #e8e8f0;
+        }
+        /* 日志 */
+        .log-area {
+            flex: 1;
+            padding: 8px;
+            overflow-y: auto;
+            font-size: 12px;
+            color: #333;
+            background: #fafafa;
+            white-space: pre-wrap;
+        }
+        /* 底部状态栏 */
+        .status-bar {
+            padding: 6px 12px;
+            background: #e8e8f0;
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+        }
+        /* 弹窗 */
+        .modal-mask {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+        }
+        .modal-box {
+            background: white;
+            padding: 20px;
+            border-radius: 6px;
+            min-width: 280px;
+        }
+        .modal-row {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部工具栏 -->
+    <div class="toolbar">
+        <div>
+            <span>节点数：</span>
+            <input type="number" id="nodeCountInput" value="6" min="1" max="26" style="width:50px">
+            <button id="applyNodeBtn">应用</button>
+        </div>
+        <div>|</div>
+        <button class="btn-mode active" data-mode="node">编辑节点</button>
+        <button class="btn-mode" data-mode="edge">添加边</button>
+        <button class="btn-mode" data-mode="start">设起点</button>
+        <button class="btn-mode" data-mode="target">设终点</button>
+        <div>|</div>
+        <button class="btn-play" id="playBtn">▶播放</button>
+        <button class="btn-pause" id="pauseBtn">⏸暂停</button>
+        <button class="btn-step" id="prevBtn">⏮上一步</button>
+        <button class="btn-step" id="nextBtn">⏭下一步</button>
+        <button class="btn-reset" id="resetBtn">⏹重置</button>
+        <div>|</div>
+        <span>动画速度：</span>
+        <input type="range" id="speedSlider" min="100" max="2000" value="1000">
+        <button id="randBtn">随机图</button>
+        <button id="clearBtn">清空画布</button>
+    </div>
+
+    <div class="main-wrap">
+        <!-- 画布区域 -->
+        <div id="canvasBox">
+            <canvas id="graphCanvas"></canvas>
+        </div>
+        <!-- 右侧面板 -->
+        <div class="info-panel">
+            <div class="step-info">
+                <div class="step-title" id="stepTitle">未开始</div>
+                <div class="step-desc" id="stepDesc">点击播放/下一步运行算法</div>
+                <div class="progress-bar">
+                    <div class="progress-inner" id="progressBar"></div>
+                </div>
+                <div style="text-align:center;margin-top:4px;font-size:12px" id="stepText">0 / 0</div>
+            </div>
+            <div class="table-wrap">
+                <table id="distTable">
+                    <thead>
+                        <tr>
+                            <th>节点</th>
+                            <th>最短距离</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="log-area" id="logArea"></div>
+        </div>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <div class="status-bar">
+        <span id="statusText">就绪：左键添加/拖拽节点，右键删除</span>
+        <span id="modeTip">当前模式：编辑节点</span>
+    </div>
+
+    <!-- 添加边弹窗 -->
+    <div class="modal-mask" id="edgeModal">
+        <div class="modal-box">
+            <div class="modal-row">
+                <label>边权重：</label>
+                <input type="number" id="weightInput" value="1" min="1">
+            </div>
+            <div class="modal-row">
+                <input type="checkbox" id="bidirectCheck">
+                <label>双向边</label>
+            </div>
+            <div class="modal-row" style="text-align:right;gap:8px;display:flex;justify-content:flex-end">
+                <button id="edgeCancel">取消</button>
+                <button id="edgeOk">确定</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+// ====================== 全局常量与数据 ======================
+const canvas = document.getElementById('graphCanvas');
+const ctx = canvas.getContext('2d');
+const canvasBox = document.getElementById('canvasBox');
+let canvasW, canvasH;
+// 交互模式
+const MODE = { NODE: 'node', EDGE: 'edge', START: 'start', TARGET: 'target', ANIMATE: 'animate' };
+let currentMode = MODE.NODE;
+// 图数据
+let nodes = [];
+let edges = [];
+let nextNodeId = 0;
+const NODE_R = 25;
+// 拖拽临时变量
+let dragNode = null, dragOffX = 0, dragOffY = 0;
+let edgeStart = null, tempMouseX = 0, tempMouseY = 0;
+let selectedNode = null;
+// 动画相关
+let animSteps = [];
+let curStepIdx = -1;
+let animTimer = null;
+let animDelay = 1000;
+let isAnimRun = false;
+// 节点状态枚举
+const NodeState = {
+    UNVISITED: '#6495ED',
+    CURRENT: '#FFA500',
+    VISITED: '#32CD32',
+    START: '#DC143C',
+    TARGET: '#800080'
+};
+// 边状态枚举
+const EdgeState = {
+    NORMAL: { color:'#999', w:2 },
+    HIGHLIGHT: { color:'#FFD700', w:4 },
+    RELAX: { color:'#32CD32', w:3 }
+};
+
+// ====================== 画布初始化 ======================
+function resizeCanvas() {
+    canvasW = canvasBox.clientWidth;
+    canvasH = canvasBox.clientHeight;
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+    render();
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// ====================== 节点、边类简化 ======================
+class Node {
+    constructor(id, name, x, y) {
+        this.id = id;
+        this.name = name;
+        this.x = x;
+        this.y = y;
+        this.state = NodeState.UNVISITED;
+        this.dist = Infinity;
+        this.isStart = false;
+        this.isTarget = false;
+    }
+    hit(px, py) {
+        let dx = px - this.x, dy = py - this.y;
+        return dx*dx + dy*dy <= NODE_R*NODE_R;
+    }
+}
+class Edge {
+    constructor(from, to, w) {
+        this.from = from;
+        this.to = to;
+        this.weight = w;
+        this.state = EdgeState.NORMAL;
+    }
+    hasNode(n) { return this.from===n || this.to===n; }
+}
+
+// ====================== 图操作API ======================
+function resetGraphState() {
+    nodes.forEach(n=>{
+        n.state = NodeState.UNVISITED;
+        n.dist = Infinity;
+    });
+    edges.forEach(e=>e.state = EdgeState.NORMAL);
+}
+function clearGraph() {
+    nodes = []; edges = []; nextNodeId = 0;
+    resetAnim();
+    render();
+    updateTable();
+}
+function addNode(name, x, y) {
+    let n = new Node(nextNodeId++, name, x, y);
+    nodes.push(n);
+    render();
+    updateTable();
+    return n;
+}
+function findNode(px, py) {
+    for(let n of nodes) if(n.hit(px,py)) return n;
+    return null;
+}
+function addEdge(from, to, weight, bidirect=false) {
+    // 去重单向
+    for(let e of edges) {
+        if(e.from===from && e.to===to) return null;
+    }
+    edges.push(new Edge(from, to, weight));
+    if(bidirect) {
+        let existRev = false;
+        for(let e of edges) {
+            if(e.from===to && e.to===from) existRev=true;
+        }
+        if(!existRev) edges.push(new Edge(to, from, weight));
+    }
+    render();
+    updateTable();
+}
+function removeNode(delNode) {
+    edges = edges.filter(e => !e.hasNode(delNode));
+    nodes = nodes.filter(n => n!==delNode);
+    selectedNode = null;
+    render();
+    updateTable();
+}
+function getOutEdges(u) {
+    return edges.filter(e=>e.from===u);
+}
+
+// ====================== 绘制渲染 ======================
+function drawGrid() {
+    ctx.strokeStyle = '#dcdce6';
+    ctx.lineWidth = 1;
+    let s = 30;
+    for(let x=0;x<=canvasW;x+=s) { ctx.beginPath(); ctx.moveTo(x,0); ctx.line(x,canvasH); ctx.stroke(); }
+    for(let y=0;y<=canvasH;y+=s) { ctx.beginPath(); ctx.moveTo(0,y); ctx.line(canvasW,y); ctx.stroke(); }
+}
+function drawArrow(x1,y1,x2,y2) {
+    let len = 12, ang = Math.PI/6;
+    let a = Math.atan2(y2-y1, x2-x1);
+    let x3 = x2 - len*Math.cos(a-ang);
+    let y3 = y2 - len*Math.sin(a-ang);
+    let x4 = x2 - len*Math.cos(a+ang);
+    let y4 = y2 - len*Math.sin(a+ang);
+    ctx.beginPath();
+    ctx.moveTo(x2,y2); ctx.lineTo(x3,y3); ctx.lineTo(x4,y4); ctx.closePath();
+    ctx.fill();
+}
+function drawEdge(e) {
+    let f = e.from, t = e.to;
+    let dx = t.x - f.x, dy = t.y - f.y;
+    let len = Math.hypot(dx, dy);
+    let sx = f.x + NODE_R * dx / len;
+    let sy = f.y + NODE_R * dy / len;
+    let ex = t.x - NODE_R * dx / len;
+    let ey = t.y - NODE_R * dy / len;
+    // 线
+    ctx.strokeStyle = e.state.color;
+    ctx.lineWidth = e.state.w;
+    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.line(ex,ey); ctx.stroke();
+    // 箭头
+    ctx.fillStyle = e.state.color;
+    drawArrow(sx,sy,ex,ey);
+    // 权重文字背景
+    let mx = (sx+ex)/2, my = (sy+ey)/2;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillRect(mx-12, my-10, 24, 18);
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 12px Microsoft YaHei';
+    ctx.textAlign = 'center';
+    ctx.fillText(e.weight, mx, my+4);
+}
+function drawNode(n) {
+    // 阴影
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.arc(n.x+3, n.y+3, NODE_R,0,Math.PI*2); ctx.fill();
+    // 底色
+    let c = n.isStart ? NodeState.START : n.isTarget ? NodeState.TARGET : n.state;
+    ctx.fillStyle = c;
+    ctx.beginPath(); ctx.arc(n.x, n.y, NODE_R,0,Math.PI*2); ctx.fill();
+    // 白边
+    ctx.strokeStyle = '#fff'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(n.x, n.y, NODE_R,0,Math.PI*2); ctx.stroke();
+    // 节点名
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px Microsoft YaHei';
+    ctx.textAlign = 'center';
+    ctx.fillText(n.name, n.x, n.y+5);
+    // 距离
+    let distText = n.dist===Infinity ? "∞" : n.dist;
+    ctx.fillStyle = n.dist===Infinity ? '#666' : '#000';
+    ctx.font = 'bold 11px Microsoft YaHei';
+    ctx.fillText(distText, n.x, n.y - NODE_R - 6);
+}
+function render() {
+    ctx.clearRect(0,0,canvasW,canvasH);
+    drawGrid();
+    // 临时虚线（添加边预览）
+    if(currentMode===MODE.EDGE && edgeStart) {
+        ctx.strokeStyle = 'rgba(255,165,0,0.7)';
+        ctx.setLineDash([8,4]);
+        ctx.lineWidth=2;
+        ctx.beginPath();
+        ctx.moveTo(edgeStart.x, edgeStart.y);
+        ctx.line(tempMouseX, tempMouseY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+    edges.forEach(drawEdge);
+    nodes.forEach(drawNode);
+    // 选中高亮
+    if(selectedNode && currentMode===MODE.NODE) {
+        ctx.strokeStyle = '#FFD700'; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.arc(selectedNode.x, selectedNode.y, NODE_R+4,0,Math.PI*2); ctx.stroke();
+    }
+    drawModeHint();
+}
+function drawModeHint() {
+    ctx.fillStyle = '#666';
+    ctx.font = '12px Microsoft YaHei';
+    ctx.textAlign = 'left';
+    let tip = "当前模式：";
+    switch(currentMode) {
+        case MODE.NODE: tip+="编辑节点(左键添加/拖拽，右键删除)"; break;
+        case MODE.EDGE: tip+="添加边(左键选起点再选终点)"; break;
+        case MODE.START: tip+="设置起点"; break;
+        case MODE.TARGET: tip+="设置终点"; break;
+        case MODE.ANIMATE: tip+="动画只读模式"; break;
+    }
+    ctx.fillText(tip, 10, canvasH-10);
+}
+
+// ====================== Dijkstra 算法 & 动画步骤拆解 ======================
+function prepareAnim(startNode) {
+    animSteps = []; curStepIdx = -1;
+    resetGraphState();
+    let dist = new Map(), prev = new Map();
+    nodes.forEach(n=>{ dist.set(n, Infinity); prev.set(n,null); });
+    dist.set(startNode, 0);
+    // 初始化步骤
+    pushStep({type:'INIT', node:startNode, msg:`初始化：起点${startNode.name}距离设为0`, snapshot:new Map(dist)});
+    // 最小堆模拟
+    let pq = [...nodes].sort((a,b)=>dist.get(a)-dist.get(b));
+    let visited = new Set();
+    while(pq.length>0) {
+        let u = pq.shift();
+        if(visited.has(u) || dist.get(u)===Infinity) continue;
+        // 取出节点步骤
+        pushStep({type:'SELECT', node:u, msg:`选中节点${u.name}，当前距离${dist.get(u)}`, snapshot:new Map(dist)});
+        // 松弛每条出边
+        for(let e of getOutEdges(u)) {
+            let v = e.to;
+            if(visited.has(v)) continue;
+            pushStep({type:'CHECK', node:u, edge:e, neighbor:v, msg:`检查边${u.name}→${v.name} 权重${e.weight}`, snapshot:new Map(dist)});
+            let newD = dist.get(u) + e.weight;
+            if(newD < dist.get(v)) {
+                let old = dist.get(v);
+                dist.set(v, newD);
+                prev.set(v, u);
+                pushStep({
+                    type:'RELAX', node:u, edge:e, neighbor:v,
+                    msg:`松弛成功！${v.name}：${old===Infinity?"∞":old} → ${newD}`,
+                    oldD:old, newD:newD, snapshot:new Map(dist)
+                });
+                pq = [...nodes].sort((a,b)=>dist.get(a)-dist.get(b));
+            }
+        }
+        visited.add(u);
+        pushStep({type:'VISIT', node:u, msg:`节点${u.name}最短路径已确定，距离${dist.get(u)}`, snapshot:new Map(dist)});
+    }
+    pushStep({type:'FINISH', msg:"算法执行完毕，所有可达节点最短路径计算完成", snapshot:new Map(dist)});
+}
+function pushStep(obj) { animSteps.push(obj); }
+// 应用单步状态
+function applyStep(step) {
+    resetGraphState();
+    let snap = step.snapshot;
+    nodes.forEach(n=>n.dist = snap.get(n));
+    switch(step.type) {
+        case 'INIT':
+            step.node.dist = 0; step.node.isStart = true; break;
+        case 'SELECT':
+            step.node.state = NodeState.CURRENT; break;
+        case 'CHECK':
+            step.edge.state = EdgeState.HIGHLIGHT; break;
+        case 'RELAX':
+            step.edge.state = EdgeState.RELAX;
+            step.neighbor.dist = step.newD; break;
+        case 'VISIT':
+            step.node.state = NodeState.VISITED; break;
+    }
+}
+// 单步前进
+function stepForward() {
+    if(curStepIdx >= animSteps.length-1) return;
+    curStepIdx++;
+    applyStep(animSteps[curStepIdx]);
+    render();
+    updateAllUI();
+}
+// 回退一步
+function stepBackward() {
+    if(curStepIdx <=0) return;
+    curStepIdx--;
+    resetGraphState();
+    for(let i=0;i<=curStepIdx;i++) applyStep(animSteps[i]);
+    render();
+    updateAllUI();
+}
+// 自动播放
+function startAutoAnim() {
+    if(isAnimRun) return;
+    let start = nodes.find(n=>n.isStart);
+    if(!start) { alert("请先设置起点！"); return; }
+    if(animSteps.length===0 || curStepIdx===-1) prepareAnim(start);
+    currentMode = MODE.ANIMATE; syncModeBtn();
+    isAnimRun = true;
+    animTimer = setInterval(()=>{
+        if(curStepIdx >= animSteps.length-1) {
+            pauseAutoAnim(); return;
+        }
+        stepForward();
+    }, animDelay);
+}
+function pauseAutoAnim() {
+    isAnimRun = false;
+    clearInterval(animTimer);
+    updateAllUI();
+}
+function resetAnim() {
+    pauseAutoAnim();
+    curStepIdx = -1; animSteps = [];
+    resetGraphState();
+    currentMode = MODE.NODE; syncModeBtn();
+    render(); updateAllUI();
+}
+
+// ====================== UI 更新函数 ======================
+function updateAllUI() {
+    updateStepInfo();
+    updateTable();
+}
+function updateStepInfo() {
+    let step = animSteps[curStepIdx];
+    let title = document.getElementById('stepTitle');
+    let desc = document.getElementById('stepDesc');
+    let bar = document.getElementById('progressBar');
+    let text = document.getElementById('stepText');
+    if(!step) {
+        title.innerText = "未开始";
+        desc.innerText = "点击播放/下一步运行算法";
+        bar.style.width = "0%";
+        text.innerText = `0 / ${animSteps.length}`;
+        return;
+    }
+    let typeMap = {
+        INIT:"初始化",SELECT:"选择节点",CHECK:"检查边",RELAX:"松弛操作",VISIT:"标记已访问",FINISH:"算法结束"
+    };
+    title.innerText = typeMap[step.type];
+    desc.innerText = step.msg;
+    let pct = ((curStepIdx+1)/animSteps.length *100).toFixed(1);
+    bar.style.width = pct + "%";
+    text.innerText = `${curStepIdx+1} / ${animSteps.length}`;
+    // 写入日志
+    let log = document.getElementById('logArea');
+    log.innerHTML += `[${typeMap[step.type]}] ${step.msg}\n`;
+    log.scrollTop = log.scrollHeight;
+}
+function updateTable() {
+    let tb = document.querySelector('#distTable tbody');
+    tb.innerHTML = "";
+    let snap = animSteps[curStepIdx]?.snapshot || null;
+    for(let n of nodes) {
+        let d = snap ? snap.get(n) : n.dist;
+        let distStr = d===Infinity ? "∞" : d;
+        let stateTxt = "未访问";
+        if(n.isStart) stateTxt="起点";
+        else if(n.isTarget) stateTxt="终点";
+        else if(n.state===NodeState.VISITED) stateTxt="已确定";
+        else if(n.state===NodeState.CURRENT) stateTxt="当前";
+        else if(d!==Infinity) stateTxt="已更新";
+        let tr = document.createElement('tr');
+        tr.innerHTML = `<td>${n.name}</td><td>${distStr}</td><td>${stateTxt}</td>`;
+        tb.appendChild(tr);
+    }
+}
+function syncModeBtn() {
+    document.querySelectorAll('.btn-mode').forEach(b=>{
+        b.classList.toggle('active', b.dataset.mode === currentMode);
+    });
+    let tipMap = {
+        node:"编辑节点", edge:"添加边", start:"设起点", target:"设终点", animate:"动画只读"
+    };
+    document.getElementById('modeTip').innerText = "当前模式："+tipMap[currentMode];
+}
+function setStatus(txt) {
+    document.getElementById('statusText').innerText = txt;
+}
+
+// ====================== 鼠标交互 ======================
+canvas.addEventListener('mousedown', e=>{
+    if(currentMode === MODE.ANIMATE) return;
+    let rect = canvas.getBoundingClientRect();
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+    let clickNode = findNode(x,y);
+    if(e.button === 0) { // 左键
+        switch(currentMode) {
+            case MODE.NODE:
+                if(clickNode) {
+                    dragNode = clickNode;
+                    dragOffX = x - clickNode.x;
+                    dragOffY = y - clickNode.y;
+                    selectedNode = clickNode;
+                    setStatus(`选中节点${clickNode.name}，可拖拽`);
+                } else {
+                    let name = String.fromCharCode(65 + nodes.length);
+                    addNode(name, x, y);
+                    setStatus(`新增节点${name}`);
+                }
+                break;
+            case MODE.EDGE:
+                if(clickNode && !edgeStart) {
+                    edgeStart = clickNode;
+                    setStatus(`已选起点${clickNode.name}，点击终点`);
+                } else if(clickNode && edgeStart && clickNode!==edgeStart) {
+                    // 弹出弹窗
+                    document.getElementById('edgeModal').style.display = 'flex';
+                }
+                break;
+            case MODE.START:
+                nodes.forEach(n=>n.isStart=false);
+                clickNode.isStart = true;
+                setStatus(`设置起点${clickNode.name}`);
+                render(); updateTable();
+                break;
+            case MODE.TARGET:
+                clickNode.isTarget = !clickNode.isTarget;
+                setStatus(clickNode.isTarget ? `添加终点${clickNode.name}`:`移除终点${clickNode.name}`);
+                render(); updateTable();
+                break;
+        }
+    } else if(e.button === 2) { // 右键删除
+        e.preventDefault();
+        if(clickNode) {
+            if(confirm(`删除节点${clickNode.name}？`)) {
+                removeNode(clickNode);
+                setStatus(`已删除节点${clickNode.name}`);
+            }
+        }
+    }
+    render();
+});
+canvas.addEventListener('mousemove', e=>{
+    let rect = canvas.getBoundingClientRect();
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+    tempMouseX = x; tempMouseY = y;
+    if(dragNode) {
+        dragNode.x = x - dragOffX;
+        dragNode.y = y - dragOffY;
+    }
+    render();
+});
+canvas.addEventListener('mouseup', ()=>{
+    dragNode = null;
+});
+// 右键屏蔽菜单
+canvas.oncontextmenu = e=>e.preventDefault();
+
+// ====================== 弹窗逻辑 ======================
+const edgeModal = document.getElementById('edgeModal');
+document.getElementById('edgeOk').onclick = ()=>{
+    let w = parseInt(document.getElementById('weightInput').value);
+    let bi = document.getElementById('bidirectCheck').checked;
+    let mx = tempMouseX, my = tempMouseY;
+    let endNode = findNode(mx, my);
+    if(endNode && edgeStart && w>0) {
+        addEdge(edgeStart, endNode, w, bi);
+        setStatus(`添加${bi?"双向":"单向"}边 ${edgeStart.name}→${endNode.name} 权重${w}`);
+    }
+    edgeStart = null; tempMouseX=0; tempMouseY=0;
+    edgeModal.style.display = 'none';
+    render();
+};
+document.getElementById('edgeCancel').onclick = ()=>{
+    edgeStart = null; tempMouseX=0; tempMouseY=0;
+    edgeModal.style.display = 'none'; render();
+};
+
+// ====================== 顶部按钮绑定 ======================
+// 模式切换按钮
+document.querySelectorAll('.btn-mode').forEach(btn=>{
+    btn.onclick = ()=>{
+        currentMode = btn.dataset.mode;
+        edgeStart = null; tempMouseX=0;
+        syncModeBtn(); render();
+    }
+});
+// 播放暂停步进
+document.getElementById('playBtn').onclick = startAutoAnim;
+document.getElementById('pauseBtn').onclick = pauseAutoAnim;
+document.getElementById('nextBtn').onclick = ()=>{
+    let s = nodes.find(n=>n.isStart);
+    if(!s) { alert("请设置起点！"); return; }
+    if(animSteps.length===0 || curStepIdx===-1) prepareAnim(s);
+    stepForward();
+};
+document.getElementById('prevBtn').onclick = stepBackward;
+document.getElementById('resetBtn').onclick = resetAnim;
+// 速度滑块
+document.getElementById('speedSlider').addEventListener('input', e=>{
+    animDelay = Number(e.target.value);
+});
+// 清空画布
+document.getElementById('clearBtn').onclick = clearGraph;
+// 生成固定节点图
+document.getElementById('applyNodeBtn').onclick = ()=>{
+    let cnt = Number(document.getElementById('nodeCountInput').value);
+    createCircleGraph(cnt);
+};
+// 随机图
+document.getElementById('randBtn').onclick = ()=>{
+    let cnt = 5 + Math.floor(Math.random()*4);
+    createCircleGraph(cnt, true);
+};
+
+// ====================== 生成圆形布局图 ======================
+function createCircleGraph(count, randomEdge=false) {
+    clearGraph();
+    let cx = canvasW/2, cy = canvasH/2, r = Math.min(cx,cy)-80;
+    let nodeList = [];
+    for(let i=0;i<count;i++) {
+        let ang = Math.PI*2*i/count - Math.PI/2;
+        let x = cx + r*Math.cos(ang);
+        let y = cy + r*Math.sin(ang);
+        let name = String.fromCharCode(65+i);
+        nodeList.push(addNode(name, x, y));
+    }
+    // 生成边
+    let edgeNum = count + Math.floor(Math.random()*count);
+    for(let i=0;i<edgeNum;i++) {
+        let f = nodeList[Math.floor(Math.random()*count)];
+        let t = nodeList[Math.floor(Math.random()*count)];
+        if(f!==t && !edges.some(e=>e.from===f&&e.to===t)) {
+            let w = 1 + Math.floor(Math.random()*10);
+            addEdge(f,t,w);
+        }
+    }
+    // 保证连通
+    for(let i=0;i<nodeList.length-1;i++) {
+        let f = nodeList[i], t = nodeList[i+1];
+        if(!edges.some(e=>e.from===f&&e.to===t)) addEdge(f,t,1+Math.floor(Math.random()*5));
+    }
+    nodeList[0].isStart = true;
+    nodeList[nodeList.length-1].isTarget = true;
+    render(); updateTable();
+}
+
+// 初始化默认6节点图
+createCircleGraph(6);
+</script>
+</body>
+</html>
