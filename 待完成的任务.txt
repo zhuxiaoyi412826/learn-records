@@ -1,0 +1,49 @@
+笔记本电脑和台式电脑不同网段下的链接  在同网段下的链接  如何传输文件
+图床的设置
+PostgreSQL是什么基础操作
+如和对git账号的切换 多种方式登录  账号密码 SSH token MCP工具链接
+git账号多用户协作  
+魂斗罗素材下载
+Fiddler 软件下载 Snipaste 软件下载和使用 charles-proxy（Charles 抓包工具）
+包劫持工具下载
+Githup CLI是什么  如springCLI和其他CLI
+Bitwarden 使用  Google Authenticator 下载使用
+一次同时推送仓库 GitHub+Gitee  
+PDF文件阅读 总计 翻译    有哪些
+常用的翻译软件和网站翻译
+多人协作开发项目 Fork 仓库 → 新建分支修改 → 提交 PR → 社区审核合并，合并后内容自动同步线上官网
+科学上网长时间 长期使用
+电报手机软件使用
+http://localhost/swagger-ui/index.html  swagger访问路径   http://localhost/doc.html#/home kinf4j访问路径
+https://github.com/kwai/DouZero 斗地主AI的使用
+Notion 的学习和使用
+数据结构算法分类  oj题目出题规范  导入数据库规范 题目规范  展示页面 后台页面  题目id规范 提交规范等等
+magic-resume 项目使用
+Edit工具的使用
+如何快速进入到powershell工具里
+maven命令的学习 主要理解maven命令执行的过程 
+解决扣子锁ip
+问题现有项目在线刷题已经有了面试算法题目，但是我现在想增加一个面试算法题目，问这个部分接口能不能共用，需要重新开发吗？ 比如插入题目 导出题目等这些内容
+学会markdown语法 python排序项目完美并且打包成exe HTML 
+Aseprite 免费版安装和使用教程 vim编辑器的使用 blander的学习  knf4ij学习 日志框架的学习    SLF4J+logf4j2 SLF4J+logbac 生成项目的目录结构（可选择目录和文件）
+手写 HTML 生成器 wg-random-name  和chinesename  分别实现 名字快速生成器 并对比生成数据效率 三者的优缺点
+理论上   MySQL单表性能瓶颈 分库分表性能瓶颈 一主2从 2主5从性能瓶颈   实践上 操作性能瓶颈
+MySQL性能优化 理论加实践 jshell的学习和使用
+tcpdump
+1. 自己的学习路线  参考尚硅谷  学习路线图   D:\daima\GitHup\coding-interview-university-main\coding-interview-university-main\translations
+2. ELK日志组件的使用  跨服务与不跨服务日志链路
+3. 自己的抽题卡片移动端 D:\daima\GitHup\computer-science-flash-cards-main 
+4. RAG 智能客服
+5. Git 的合并分支 解决冲突完全掌握
+6. jmter压差 
+7. 性能优化 优化到 10W QPS 500TPS
+8. 算法题目分类   面试题目分类 设定好规划  
+9. 语意检索达到自己的想法
+10. AIGC的使用  
+11.claucode codex CLI 的使用
+12.理解全部的接口作用
+13.设计和理解全部的数据库
+14.3Blue1Brown 深度学习 6个视频  线性代数 微积分 全面掌握
+15.部署和启动天机学堂并完成Agent
+16.微信支付 支付宝支付 微信公众号登录  小程序登录 邮箱  手机号登录  gitee githup登录
+一定要完全掌握透，写成文章
