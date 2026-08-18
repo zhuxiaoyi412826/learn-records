@@ -75,7 +75,7 @@ pip install -U langchain deepagents
 ```
 import os
 # 配置OpenAI API密钥，否则模型无法正常调用
-os.environ["OPENAI_API_KEY"] = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+os.environ["OPENAI_API_KEY"] = 
 ```
 
 ```
