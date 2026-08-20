@@ -1,18 +1,4 @@
-# SpringBoot + ELK 全链路日志系统开发文档
-
-**EFK = Elasticsearch + Fluentd + Kibana**，是替代 ELK (Logstash) 的日志技术栈，去掉重量级 Logstash，改用轻量 Fluentd 采集清洗。
-
-| 组件                          | 角色            | 端口         | 核心职责                                                     |
-| ----------------------------- | --------------- | ------------ | ------------------------------------------------------------ |
-| **Elasticsearch**             | 存储 & 检索引擎 | 9200         | 存储日志，倒排索引分词检索，支持向量存储；接收 Fluentd 推送的数据 |
-| **Fluentd(td‑agent Windows)** | 采集 + 日志清洗 | 24220 (监控) | 读取日志文件、接收日志；filter 做清洗解析；输出推送到 ES     |
-| **Kibana**                    | 可视化控制台    | 5601         | 索引模式配置、Discover 查看日志、搜索过滤、图表、告警、仪表盘 |
-
-注意区分  
-
-**Filebeat：纯采集 Agent，轻量，清洗能力弱** 
-
-**Fluentd：采集 + 强大清洗 ETL，完整日志管道，就是你现在 Windows 用的 td‑agent** (filter清洗插件)
+# SpringBoot + EFKS 全链路日志系统开发文档
 
 ## 一、系统整体架构
 
@@ -121,7 +107,7 @@
 | Python 验证脚本                    | [verify_tracing.py](file:///d:/daima/XiangMu/算法数据结构可视化/AlgoVize/Agent/know-retrieval/verify_tracing.py) |
 | 日志统一存放目录                   | `D:/rizi`                                                    |
 
-## 二、Windows 环境 ELK 部署
+## 二、Windows 环境 EFK 部署
 
 ### 2.1 环境准备
 
@@ -131,9 +117,9 @@
 
 ```
 D:\ELK\
-├── elasticsearch-8.13.4\
-├── logstash-8.13.4\
-├── kibana-8.13.4\
+├── elasticsearch-7.12.1\
+├── Fluentd\
+├── Kiabana
 └── ik-analyzer\
 ```
 
@@ -1479,46 +1465,53 @@ public class LogDocument {
 
 ## 五、关键词屏蔽系统设计
 
+检测是 Java 干的活；ES 只是把 Java 干完活留下的工作记录全部存起来。
+
+敏感词过滤 ES收集反馈到MySQL 加强敏感词表
+
 **业务流程**
 
 ```
-用户搜索/提交内容
-        │
-        ▼
-产生日志 → Logstash → Elasticsearch
-        │
-        ▼
-定时任务分析 ES 高频搜索词
-        │
-        ▼
-过滤已存在敏感词、停用词、频率阈值
-        │
-        ▼
-写入敏感词候选表（status=0 待审核）
-        │
-        ▼
-管理员人工审核
-        │
-        ├──通过 → 写入敏感词正式库 → 刷新 DFA 过滤器
-        │
-        └──驳回 → 仅更新候选表状态
+1.用户提交作答内容
+    ↓
+2.SpringBoot JVM内存DFA敏感词检测（提交链路不访问ES、Redis）
+    ├A：命中已有敏感词
+    │   ·输出WARN日志：userId、problemId、submission_id、hit_words、submit_content_short截断摘要
+    │   ·MySQL保存submission status=BLOCKED
+    │   ·返回前端提示违规
+    │
+    └B：未命中现有敏感词，但业务判定疑似违规（人工标记/业务规则识别）
+        ·正常放行，作答完整内容存入MySQL submission
+        ·输出INFO标记日志 message:"疑似违规内容，需要人工复核"，带上submit_content_short、submission_id
+
+3.日志写入磁盘文件 → Filebeat采集 → Elasticsearch存储事件索引
+
+4.【定时任务半自动提取候选新词】
+    ↓定时（例如每小时执行一次）SpringBoot定时任务
+    4‑1 使用ES RestHighLevelClient调用ES查询API
+        查询条件：
+        ①时间窗口：最近1小时/最近24小时
+        ②过滤：level:WARN（命中敏感词） OR message:"疑似违规内容，需要人工复核"
+    4‑2 批量拉取ES日志文档，拿到 submit_content_short、hit_sensitive_words、submission_id、user_id
+    4‑3 对submit_content_short文本做简单分词提取候选关键词（简单分词，不做DFA判断）
+    4‑4 过滤掉已经存在于MySQL sensitive_word表中的已有敏感词，过滤掉过短无意义字符
+    4‑5 将筛选后的【候选新词、来源submission_id、来源用户ID、发生时间】存入一张MySQL中间表 `sensitive_word_candidate`
+        >⚠️这里仅仅存入候选表，**不会直接写入正式sensitive_word敏感词表**
+
+5.管理后台读取 `sensitive_word_candidate` 候选词列表页面
+    运营人员查看候选词，可以查看来源的submission_id，跳转查询原始提交记录
+    ├人工审核通过：点击新增敏感词，插入正式表`sensitive_word`
+    └人工判定为正常词汇：标记忽略，丢弃该候选
+
+6.新增正式敏感词落库MySQL sensitive_word
+    ↓触发敏感词库刷新 sensitiveManager.reload()
+    SpringBoot读取MySQL正式敏感词，重建JVM内存DFA树
+
+7.后续用户提交作答，新加入的敏感词即可被DFA拦截
+
 ```
-
-
 
 ### 5.1 系统架构
-
-```
-日志输入 → 关键词检测引擎 → 命中检测 → 分级处理
-                    ↑
-           ┌────────┴────────┐
-           │                 │
-      本地词库缓存       远程词库加载
-           ↑                 ↑
-        Redis             MySQL
-           ↑
-      定时同步任务
-```
 
 ### 5.2 核心算法：DFA 敏感词树
 
@@ -2207,10 +2200,10 @@ public class AuditController {
    D:\ELK\kibana-8.13.4\bin\kibana.bat
    ```
 
-3. **启动 Logstash**
+3. **启动Fluentd**
 
    ```
-   D:\ELK\logstash-8.13.4\bin\logstash.bat -f ../config/logback-springboot.conf
+   
    ```
 
 4. **启动 MySQL** 并执行建表脚本
@@ -2247,150 +2240,4 @@ public class AuditController {
 
 
 
-
-### 4. Spring Boot 配置修改
-
-#### 4.1 修改 `logback-spring.xml`
-
-仅需修改 `destination` 地址为 Fluentd 的 TCP 端口（24224）：
-
-xml
-
-```
-<appender name="FLUENTD" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
-    <destination>127.0.0.1:24224</destination>
-    <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-        <customFields>{"appName":"question-bank","env":"dev"}</customFields>
-        <includeMdc>true</includeMdc>
-    </encoder>
-    <keepAliveDuration>5 minutes</keepAliveDuration>
-</appender>
-```
-
-
-
-同时将 root 中的 `LOGSTASH` 改为 `FLUENTD`：
-
-xml
-
-```
-<root level="INFO">
-    <appender-ref ref="CONSOLE"/>
-    <appender-ref ref="FLUENTD"/>
-</root>
-```
-
-
-
-**无需修改 Maven 依赖**，继续使用 `logstash-logback-encoder`。
-
-#### 4.2 其他代码不变
-
-- `TraceIdFilter`、MDC、全链路追踪逻辑不变。
-- 结构化日志输出不变。
-- 定时分析任务、敏感词系统不变。
-
-------
-
-### 5. Elasticsearch 索引模板（不变）
-
-无需修改之前创建的 `app-logs-template`，字段映射依然适用。
-
-------
-
-### 6. 验证步骤（更新）
-
-#### 6.1 启动顺序
-
-1. 启动 Elasticsearch、Kibana。
-2. 启动 Fluentd（Docker 容器或直接运行）。
-3. 启动 Spring Boot 应用。
-4. 调用搜索接口：
-
-cmd
-
-```
-curl "http://localhost:8080/api/questions/search?keyword=动态规划"
-```
-
-
-
-#### 6.2 验证 Fluentd 接收日志
-
-检查 Fluentd 日志输出（Docker 容器可 `docker logs fluentd`），应看到接收的日志记录。
-
-#### 6.3 验证 Elasticsearch 索引
-
-在 Kibana Dev Tools 中查询：
-
-json
-
-```
-GET app-logs-*/_search
-{
-  "query": {
-    "match_all": {}
-  },
-  "size": 1
-}
-```
-
-
-
-确认有数据。
-
-#### 6.4 验证全链路 traceId
-
-同原方案，从响应头获取 `X-Trace-Id` 并在 ES 中查询。
-
-#### 6.5 验证分词查询
-
-同原方案，使用 `match` 查询 `message` 或 `searchWord`。
-
-------
-
-### 7. 常见问题
-
-#### 7.1 Fluentd 无法接收日志
-
-- 检查 Fluentd 是否监听 24224 端口：`netstat -an | findstr 24224`。
-- 检查 Spring Boot 日志中是否有连接错误。
-- 若使用 Docker，确认端口映射 `-p 24224:24224` 正确。
-
-#### 7.2 Fluentd 输出到 Elasticsearch 失败
-
-- 检查 Fluentd 日志中是否有错误信息。
-- 确认 `fluent-plugin-elasticsearch` 插件已安装（Docker 镜像已包含）。
-- 确认 Elasticsearch 地址和端口正确（127.0.0.1:9200）。
-
-#### 7.3 时间字段问题
-
-- 如果 Kibana 中时间不正确，检查 Fluentd 的 `time_key` 配置和 Logback 输出的 `@timestamp` 格式是否兼容。
-- 可简化配置，让 Fluentd 使用自身时间（去掉 `time_key`），但会丢失原始日志时间。
-
-#### 7.4 Windows 直接安装 Fluentd 失败
-
-- 推荐使用 Docker 方式，避免 Ruby 环境问题。
-- 如果必须直接安装，请使用 RubyInstaller + DevKit 并安装 `fluentd` gem，确保网络可访问 [rubygems.org](https://rubygems.org/)。
-
-#### 7.5 Logback 连接 Fluentd 后日志丢失
-
-- 检查 Fluentd 的 `in_tcp` 是否使用 `json` 解析，且 `tag` 匹配。
-- 若日志中包含非 JSON 内容（如堆栈换行），可能解析失败，可在 Fluentd 中使用 `@type multiline` 或 `@type json` 并设置 `unmatched_lines`。
-
-------
-
-### 8. 总结
-
-本次改造仅将日志收集器从 **Logstash** 替换为 **Fluentd**：
-
-| 组件             | 原方案                     | 新方案                      |
-| :--------------- | :------------------------- | :-------------------------- |
-| 日志收集器       | Logstash                   | Fluentd                     |
-| 接收端口         | 5044                       | 24224                       |
-| 输入协议         | TCP + JSON lines           | TCP + JSON lines            |
-| 输出目标         | Elasticsearch              | Elasticsearch               |
-| Spring Boot 配置 | destination 127.0.0.1:5044 | destination 127.0.0.1:24224 |
-
-其余功能（全链路追踪、分词查询、关键词屏蔽、人工审核）完全保持不变。Fluentd 相比 Logstash 更轻量，适合开发机资源有限的环境，且可通过 Docker 快速部署。
 

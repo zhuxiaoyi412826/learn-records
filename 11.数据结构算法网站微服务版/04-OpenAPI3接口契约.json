@@ -1,0 +1,1062 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "在线刷题平台（微服务版）API 契约",
+    "description": "微服务版在线刷题平台对外接口契约，覆盖注册登录、用户管理、题库刷题、答题记录、评论回复、AI 对话等核心能力。统一返回格式、JWT 鉴权、接口防重放签名、RESTful 规范。",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Platform Team"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.example.com/api",
+      "description": "生产环境"
+    },
+    {
+      "url": "https://test.example.com/api",
+      "description": "测试环境"
+    },
+    {
+      "url": "http://localhost:8080/api",
+      "description": "本地开发环境"
+    }
+  ],
+  "tags": [
+    { "name": "认证", "description": "注册、登录、登出、令牌刷新" },
+    { "name": "用户", "description": "用户 CRUD、分页、搜索" },
+    { "name": "题库", "description": "题目分类与题目 CRUD、刷题" },
+    { "name": "答题", "description": "提交答题、答题记录、错题本" },
+    { "name": "评论", "description": "评论发表、回复、删除" },
+    { "name": "AI 对话", "description": "大模型对话、RAG 问答、流式响应" }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["认证"],
+        "summary": "用户注册",
+        "operationId": "register",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password", "phone"],
+                "properties": {
+                  "username": { "type": "string", "minLength": 3, "maxLength": 32, "example": "zhangsan" },
+                  "password": { "type": "string", "minLength": 8, "example": "P@ssw0rd123" },
+                  "phone": { "type": "string", "example": "13800138000" },
+                  "nickname": { "type": "string", "example": "张三" },
+                  "email": { "type": "string", "format": "email", "example": "zhangsan@example.com" },
+                  "tenantId": { "type": "integer", "format": "int64", "description": "租户 ID（多租户注册时指定，可空）" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "注册成功",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse" },
+                "example": { "code": 0, "message": "success", "traceId": "6ab2f0e1", "data": { "userId": 1001 } }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": {
+            "description": "用户名或手机号已存在",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiResponse" } } }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["认证"],
+        "summary": "用户登录",
+        "description": "成功后返回 JWT 访问令牌与刷新令牌。密码使用 BCrypt 校验，令牌存入 Redis。",
+        "operationId": "login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password"],
+                "properties": {
+                  "username": { "type": "string", "example": "zhangsan" },
+                  "password": { "type": "string", "example": "P@ssw0rd123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "登录成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/LoginResult" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": {
+            "description": "用户名或密码错误",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiResponse" } } }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["认证"],
+        "summary": "用户登出",
+        "description": "使当前令牌在 Redis 中失效。",
+        "operationId": "logout",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "登出成功",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": ["认证"],
+        "summary": "刷新令牌",
+        "operationId": "refreshToken",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["refreshToken"],
+                "properties": {
+                  "refreshToken": { "type": "string", "description": "刷新令牌" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "刷新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/LoginResult" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "tags": ["用户"],
+        "summary": "分页查询用户",
+        "description": "支持关键字搜索、状态过滤。受数据行权限约束（按租户/部门/本人过滤）。",
+        "operationId": "listUsers",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/PageNum" },
+          { "$ref": "#/components/parameters/PageSize" },
+          {
+            "name": "keyword",
+            "in": "query",
+            "description": "用户名/昵称/手机号关键字",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "账号状态：1 启用 / 0 停用",
+            "schema": { "type": "integer", "enum": [0, 1] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "records": { "type": "array", "items": { "$ref": "#/components/schemas/User" } },
+                            "total": { "type": "integer", "example": 120 },
+                            "pageNum": { "type": "integer", "example": 1 },
+                            "pageSize": { "type": "integer", "example": 20 }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      },
+      "post": {
+        "tags": ["用户"],
+        "summary": "新增用户",
+        "description": "需具备按钮权限 user:add。手机号、身份证落库脱敏。",
+        "operationId": "createUser",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password"],
+                "properties": {
+                  "username": { "type": "string", "example": "lisi" },
+                  "password": { "type": "string", "minLength": 8 },
+                  "nickname": { "type": "string" },
+                  "phone": { "type": "string" },
+                  "idCard": { "type": "string", "description": "身份证号，落库加密脱敏" },
+                  "roleIds": { "type": "array", "items": { "type": "integer", "format": "int64" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "创建成功",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/users/{userId}": {
+      "get": {
+        "tags": ["用户"],
+        "summary": "查询用户详情",
+        "operationId": "getUser",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功，敏感字段脱敏返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/User" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["用户"],
+        "summary": "修改用户",
+        "description": "需按钮权限 user:edit。",
+        "operationId": "updateUser",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nickname": { "type": "string" },
+                  "phone": { "type": "string" },
+                  "email": { "type": "string" },
+                  "status": { "type": "integer", "enum": [0, 1] },
+                  "roleIds": { "type": "array", "items": { "type": "integer", "format": "int64" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "修改成功",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      },
+      "delete": {
+        "tags": ["用户"],
+        "summary": "删除用户（逻辑删除）",
+        "description": "需按钮权限 user:delete。",
+        "operationId": "deleteUser",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/categories": {
+      "get": {
+        "tags": ["题库"],
+        "summary": "查询题目分类树",
+        "operationId": "listCategories",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "分类列表（树形）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/QuestionCategory" } } }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/questions": {
+      "get": {
+        "tags": ["题库"],
+        "summary": "分页查询题目",
+        "description": "支持分类、难度、关键字过滤，命中 Redis 热点缓存。",
+        "operationId": "listQuestions",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/PageNum" },
+          { "$ref": "#/components/parameters/PageSize" },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "schema": { "type": "integer", "format": "int64" }
+          },
+          {
+            "name": "difficulty",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 5 }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "records": { "type": "array", "items": { "$ref": "#/components/schemas/Question" } },
+                            "total": { "type": "integer" },
+                            "pageNum": { "type": "integer" },
+                            "pageSize": { "type": "integer" }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["题库"],
+        "summary": "新增题目",
+        "operationId": "createQuestion",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "answer"],
+                "properties": {
+                  "categoryId": { "type": "integer", "format": "int64" },
+                  "title": { "type": "string" },
+                  "content": { "type": "string" },
+                  "answer": { "type": "string" },
+                  "analysis": { "type": "string" },
+                  "difficulty": { "type": "integer", "minimum": 1, "maximum": 5 },
+                  "questionType": { "type": "integer", "description": "1 单选 2 多选 3 判断 4 简答" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "创建成功",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/questions/{questionId}": {
+      "get": {
+        "tags": ["题库"],
+        "summary": "查询题目详情",
+        "operationId": "getQuestion",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/Question" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["题库"],
+        "summary": "修改题目",
+        "operationId": "updateQuestion",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "content": { "type": "string" },
+                  "answer": { "type": "string" },
+                  "analysis": { "type": "string" },
+                  "difficulty": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "修改成功",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiResponse" } } }
+          },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      },
+      "delete": {
+        "tags": ["题库"],
+        "summary": "删除题目（逻辑删除）",
+        "operationId": "deleteQuestion",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiResponse" } } }
+          },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/questions/{questionId}/submit": {
+      "post": {
+        "tags": ["答题"],
+        "summary": "提交答题",
+        "description": "接口幂等：请求头携带 X-Idempotent-Key，重复提交返回缓存结果。",
+        "operationId": "submitAnswer",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["userAnswer"],
+                "properties": {
+                  "userAnswer": { "type": "string" },
+                  "durationMs": { "type": "integer", "description": "作答耗时（毫秒）" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "提交成功，返回判题结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "isCorrect": { "type": "boolean" },
+                            "correctAnswer": { "type": "string" },
+                            "analysis": { "type": "string" },
+                            "recordId": { "type": "integer", "format": "int64" }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "重复提交（幂等冲突）",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiResponse" } } }
+          }
+        }
+      }
+    },
+    "/answer-records": {
+      "get": {
+        "tags": ["答题"],
+        "summary": "查询答题记录 / 错题本",
+        "operationId": "listAnswerRecords",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/PageNum" },
+          { "$ref": "#/components/parameters/PageSize" },
+          {
+            "name": "onlyWrong",
+            "in": "query",
+            "description": "仅查询错题",
+            "schema": { "type": "boolean", "default": false }
+          },
+          {
+            "name": "questionId",
+            "in": "query",
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "records": { "type": "array", "items": { "$ref": "#/components/schemas/AnswerRecord" } },
+                            "total": { "type": "integer" },
+                            "pageNum": { "type": "integer" },
+                            "pageSize": { "type": "integer" }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/questions/{questionId}/comments": {
+      "get": {
+        "tags": ["评论"],
+        "summary": "分页查询题目评论",
+        "operationId": "listComments",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          },
+          { "$ref": "#/components/parameters/PageNum" },
+          { "$ref": "#/components/parameters/PageSize" }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "records": { "type": "array", "items": { "$ref": "#/components/schemas/Comment" } },
+                            "total": { "type": "integer" },
+                            "pageNum": { "type": "integer" },
+                            "pageSize": { "type": "integer" }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["评论"],
+        "summary": "发表评论",
+        "description": "内容经敏感词过滤后落库，命中屏蔽词自动拒绝。",
+        "operationId": "createComment",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["content"],
+                "properties": {
+                  "content": { "type": "string", "maxLength": 1000 },
+                  "parentId": { "type": "integer", "format": "int64", "description": "回复的父评论 ID，0 表示顶级评论" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "发表成功",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiResponse" } } }
+          },
+          "422": {
+            "description": "内容含敏感词",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiResponse" } } }
+          }
+        }
+      }
+    },
+    "/comments/{commentId}": {
+      "delete": {
+        "tags": ["评论"],
+        "summary": "删除评论",
+        "operationId": "deleteComment",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "commentId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiResponse" } } }
+          },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/chat/send": {
+      "post": {
+        "tags": ["AI 对话"],
+        "summary": "AI 对话（流式）",
+        "description": "对接大模型 API，支持 RAG 召回增强。响应为 SSE 流式返回；请求体可 AES 加密。",
+        "operationId": "chatSend",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["sessionId", "message"],
+                "properties": {
+                  "sessionId": { "type": "string", "description": "会话标识" },
+                  "message": { "type": "string", "description": "用户输入" },
+                  "enableRag": { "type": "boolean", "default": true, "description": "是否启用 RAG 知识库检索" },
+                  "model": { "type": "string", "description": "指定模型，可选" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SSE 流式响应",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chunk": { "type": "string", "description": "增量文本片段" },
+                    "sources": { "type": "array", "items": { "type": "string" }, "description": "RAG 引用来源" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/chat/history": {
+      "get": {
+        "tags": ["AI 对话"],
+        "summary": "查询对话历史",
+        "operationId": "listChatHistory",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/PageNum" },
+          { "$ref": "#/components/parameters/PageSize" },
+          {
+            "name": "sessionId",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "records": { "type": "array", "items": { "$ref": "#/components/schemas/ChatMessage" } },
+                            "total": { "type": "integer" },
+                            "pageNum": { "type": "integer" },
+                            "pageSize": { "type": "integer" }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "登录后返回的 JWT 访问令牌，格式：Authorization: Bearer <token>"
+      }
+    },
+    "parameters": {
+      "PageNum": {
+        "name": "pageNum",
+        "in": "query",
+        "description": "页码，从 1 开始",
+        "schema": { "type": "integer", "minimum": 1, "default": 1 }
+      },
+      "PageSize": {
+        "name": "pageSize",
+        "in": "query",
+        "description": "每页条数",
+        "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+      },
+      "IdempotencyKey": {
+        "name": "X-Idempotent-Key",
+        "in": "header",
+        "required": false,
+        "description": "幂等键，用于 POST 请求去重",
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    },
+    "schemas": {
+      "ApiResponse": {
+        "type": "object",
+        "description": "统一返回结构",
+        "required": ["code", "message", "traceId"],
+        "properties": {
+          "code": { "type": "integer", "description": "0 成功，非 0 失败", "example": 0 },
+          "message": { "type": "string", "description": "提示信息", "example": "success" },
+          "traceId": { "type": "string", "description": "链路追踪 ID", "example": "6ab2f0e1a3bc4d5e" },
+          "data": { "type": "object", "description": "业务数据（随接口不同而变化）" }
+        }
+      },
+      "LoginResult": {
+        "type": "object",
+        "properties": {
+          "accessToken": { "type": "string", "description": "JWT 访问令牌" },
+          "refreshToken": { "type": "string", "description": "刷新令牌" },
+          "expiresIn": { "type": "integer", "description": "访问令牌有效期（秒）", "example": 1800 },
+          "userInfo": { "$ref": "#/components/schemas/User" }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "integer", "format": "int64" },
+          "username": { "type": "string" },
+          "nickname": { "type": "string" },
+          "phone": { "type": "string", "description": "脱敏手机号", "example": "138****8000" },
+          "idCard": { "type": "string", "description": "脱敏身份证", "example": "110***********1234" },
+          "email": { "type": "string" },
+          "avatar": { "type": "string" },
+          "status": { "type": "integer", "description": "1 启用 0 停用" },
+          "roleCodes": { "type": "array", "items": { "type": "string" } },
+          "createTime": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Question": {
+        "type": "object",
+        "properties": {
+          "questionId": { "type": "integer", "format": "int64" },
+          "categoryId": { "type": "integer", "format": "int64" },
+          "title": { "type": "string" },
+          "content": { "type": "string" },
+          "analysis": { "type": "string" },
+          "difficulty": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "questionType": { "type": "integer", "description": "1 单选 2 多选 3 判断 4 简答" },
+          "likeCount": { "type": "integer" },
+          "viewCount": { "type": "integer" },
+          "createTime": { "type": "string", "format": "date-time" }
+        }
+      },
+      "QuestionCategory": {
+        "type": "object",
+        "properties": {
+          "categoryId": { "type": "integer", "format": "int64" },
+          "parentId": { "type": "integer", "format": "int64" },
+          "categoryName": { "type": "string" },
+          "children": { "type": "array", "items": { "$ref": "#/components/schemas/QuestionCategory" } }
+        }
+      },
+      "AnswerRecord": {
+        "type": "object",
+        "properties": {
+          "recordId": { "type": "integer", "format": "int64" },
+          "questionId": { "type": "integer", "format": "int64" },
+          "questionTitle": { "type": "string" },
+          "userAnswer": { "type": "string" },
+          "isCorrect": { "type": "boolean" },
+          "durationMs": { "type": "integer" },
+          "createTime": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Comment": {
+        "type": "object",
+        "properties": {
+          "commentId": { "type": "integer", "format": "int64" },
+          "userId": { "type": "integer", "format": "int64" },
+          "nickname": { "type": "string" },
+          "avatar": { "type": "string" },
+          "parentId": { "type": "integer", "format": "int64" },
+          "content": { "type": "string" },
+          "likeCount": { "type": "integer" },
+          "children": { "type": "array", "items": { "$ref": "#/components/schemas/Comment" } },
+          "createTime": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ChatMessage": {
+        "type": "object",
+        "properties": {
+          "chatId": { "type": "integer", "format": "int64" },
+          "sessionId": { "type": "string" },
+          "userMessage": { "type": "string" },
+          "assistantMessage": { "type": "string" },
+          "model": { "type": "string" },
+          "createTime": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "参数校验失败",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ApiResponse" },
+            "example": { "code": 40000, "message": "参数校验失败：username 不能为空", "traceId": "6ab2f0e1" }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "未认证或令牌失效",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ApiResponse" },
+            "example": { "code": 40100, "message": "请先登录", "traceId": "6ab2f0e1" }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "无权限",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ApiResponse" },
+            "example": { "code": 40300, "message": "无权访问该资源", "traceId": "6ab2f0e1" }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "资源不存在",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ApiResponse" },
+            "example": { "code": 40400, "message": "资源不存在", "traceId": "6ab2f0e1" }
+          }
+        }
+      }
+    },
+    "headers": {
+      "ReplayToken": {
+        "description": "接口防重放签名请求头",
+        "schema": { "type": "object" }
+      }
+    }
+  },
+  "security": [
+    { "bearerAuth": [] }
+  ]
+}

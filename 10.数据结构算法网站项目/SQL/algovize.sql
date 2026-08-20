@@ -687,3 +687,219 @@ SELECT * FROM (
 SET FOREIGN_KEY_CHECKS = 1;
 
 SELECT '面试题目模块 5 张表 + 示例数据初始化完成' AS message;
+
+-- 8 新增货币系统
+-- ============================================================================
+-- 货币系统（硬币）SQL —— 幂等，可重复执行
+-- 不修改 algovize.sql，仅新增表和字段
+-- ============================================================================
+
+USE `algoviz`;
+SET NAMES utf8mb4;
+
+-- 1. user 表新增 coins 字段（初始 1000 硬币）
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = 'algoviz' AND TABLE_NAME = 'user' AND COLUMN_NAME = 'coins');
+SET @sql = IF(@col_exists = 0,
+    'ALTER TABLE `user` ADD COLUMN `coins` INT NOT NULL DEFAULT 1000 COMMENT ''硬币余额'' AFTER `status`',
+    'SELECT ''coins 字段已存在'' AS msg');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 已有用户补充硬币（仅 coins 为 NULL 或未设置的）
+UPDATE `user` SET `coins` = 1000 WHERE `coins` IS NULL OR `coins` = 0;
+
+-- 2. 硬币商品表
+CREATE TABLE IF NOT EXISTS `coin_product` (
+    `id`            BIGINT        NOT NULL AUTO_INCREMENT,
+    `product_id`    VARCHAR(64)   NOT NULL                COMMENT '商品编号',
+    `product_name`  VARCHAR(200)  NOT NULL                COMMENT '商品名称',
+    `description`   TEXT                                  COMMENT '商品描述',
+    `coin_price`    INT           NOT NULL                COMMENT '硬币价格',
+    `category`      VARCHAR(50)   DEFAULT 'coin'          COMMENT '分类',
+    `icon`          VARCHAR(20)   DEFAULT '🪙'            COMMENT '图标',
+    `status`        VARCHAR(20)   DEFAULT 'ACTIVE'        COMMENT 'ACTIVE=上架 INACTIVE=下架',
+    `created_at`    DATETIME      DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`    DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_coin_product_id` (`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='硬币商品表';
+
+-- 3. 硬币购买记录表
+CREATE TABLE IF NOT EXISTS `coin_purchase` (
+    `id`            BIGINT        NOT NULL AUTO_INCREMENT,
+    `user_id`       BIGINT        NOT NULL                COMMENT '用户ID',
+    `username`      VARCHAR(100)  DEFAULT NULL            COMMENT '冗余用户名',
+    `product_id`    VARCHAR(64)   NOT NULL                COMMENT '商品编号',
+    `product_name`  VARCHAR(200)  NOT NULL                COMMENT '商品名称',
+    `coin_price`    INT           NOT NULL                COMMENT '消耗硬币数',
+    `coin_before`   INT           DEFAULT NULL            COMMENT '购买前余额',
+    `coin_after`    INT           DEFAULT NULL            COMMENT '购买后余额',
+    `status`        VARCHAR(20)   DEFAULT 'SUCCESS'       COMMENT 'SUCCESS=成功',
+    `created_at`    DATETIME      DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_coin_purchase_user_id` (`user_id`),
+    KEY `idx_coin_purchase_product_id` (`product_id`),
+    KEY `idx_coin_purchase_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='硬币购买记录表';
+
+-- 4. 初始化 9 个硬币商品（每次启动覆盖更新，修复乱码）
+INSERT INTO `coin_product` (`product_id`, `product_name`, `description`, `coin_price`, `category`, `icon`, `status`)
+VALUES
+    ('coin-ds-visual',        '数据结构图解手册',  '图文并茂讲解数组/链表/树/图等核心数据结构', 120,  'coin', '📊', 'ACTIVE'),
+    ('coin-algo-notes',       '算法基础笔记',      '常见排序/查找/递归算法详细笔记',           100,  'coin', '📝', 'ACTIVE'),
+    ('coin-java-notes',       'JavaSE核心笔记',    '面向对象/集合/多线程/IO知识点总结',       150,  'coin', '☕', 'ACTIVE'),
+    ('coin-interview100',     '面试必刷100题',     '高频面试题集含详细解析',                   350,  'coin', '🎯', 'ACTIVE'),
+    ('coin-algo-tutorial',    '算法入门教程',      '零基础入门含视频讲解和实战',               300,  'coin', '🎓', 'ACTIVE'),
+    ('coin-advanced-tutorial','算法进阶教程',      '面试竞赛级高级算法教程',                   500,  'coin', '🚀', 'ACTIVE'),
+    ('coin-viz-project',      '可视化项目源码',    'AlgoViz算法可视化项目完整源码',            800,  'coin', '💻', 'ACTIVE'),
+    ('coin-ai-project',       'AI辅助算法项目',    '结合AI的智能算法分析系统',                 1000, 'coin', '🌟', 'ACTIVE'),
+    ('coin-dp-master',        '动态规划专题',      '从入门到精通DP经典题集',                   280,  'coin', '🧩', 'ACTIVE')
+ON DUPLICATE KEY UPDATE
+    `product_name` = VALUES(`product_name`),
+    `description`  = VALUES(`description`),
+    `coin_price`   = VALUES(`coin_price`),
+    `icon`         = VALUES(`icon`);
+
+SELECT '货币系统初始化完成' AS message;
+
+--9 关键词屏蔽审核系统建表脚本
+
+-- 关键词屏蔽审核系统建表脚本
+-- 依赖: MySQL 8.0 + algoviz 库
+
+-- 1. 敏感词表（工作区，可增删改；发布版本后快照冻结）
+CREATE TABLE IF NOT EXISTS sensitive_word (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    word        VARCHAR(128) NOT NULL COMMENT '敏感词',
+    category    VARCHAR(32)  NOT NULL DEFAULT 'ABUSE' COMMENT '分类: ABUSE辱骂/POLITICS涉政/ADVERTISING广告/PORN色情/OTHER',
+    LEVEL       VARCHAR(16)  NOT NULL DEFAULT 'MEDIUM' COMMENT '等级: HIGH拦截/MEDIUM待审/LOW仅记录',
+    match_mode  VARCHAR(16)  NOT NULL DEFAULT 'EXACT' COMMENT '匹配模式: EXACT/FUZZY',
+    enabled     TINYINT      NOT NULL DEFAULT 1 COMMENT '是否启用',
+    create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_word (word)
+) ENGINE=INNODB DEFAULT CHARSET=utf8mb4 COMMENT='敏感词库（工作区）';
+
+-- 2. 敏感词版本表（每次"发布版本"将当前词库快照冻结存档，支持回滚）
+CREATE TABLE IF NOT EXISTS sensitive_word_version (
+    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+    version_no    INT          NOT NULL COMMENT '版本号（递增）',
+    word_count    INT          NOT NULL DEFAULT 0 COMMENT '该版本词条数',
+    snapshot_json LONGTEXT     COMMENT '词库快照 JSON [{word,category,level}]',
+    remark        VARCHAR(256) COMMENT '版本说明',
+    created_by    VARCHAR(64)  COMMENT '发布人',
+    create_time   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_version (version_no)
+) ENGINE=INNODB DEFAULT CHARSET=utf8mb4 COMMENT='敏感词版本快照';
+
+-- 3. 危险代码规则表（正则规则，检测提交代码中的危害模式）
+CREATE TABLE IF NOT EXISTS dangerous_code_rule (
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    rule_code    VARCHAR(64)  NOT NULL COMMENT '规则编码',
+    rule_name    VARCHAR(128) COMMENT '规则名称',
+    LANGUAGE     VARCHAR(32)  NOT NULL DEFAULT 'ALL' COMMENT '适用语言: ALL/JAVA/PYTHON/JS/CPP',
+    rule_type    VARCHAR(32)  NOT NULL DEFAULT 'REGEX' COMMENT '规则类型: REGEX/KEYWORD',
+    rule_content TEXT         NOT NULL COMMENT '规则内容（正则或关键词）',
+    risk_level   VARCHAR(16)  NOT NULL DEFAULT 'HIGH' COMMENT '风险等级: HIGH/MEDIUM/LOW',
+    score        INT          NOT NULL DEFAULT 80 COMMENT '风险分值',
+    enabled      TINYINT      NOT NULL DEFAULT 1,
+    DESCRIPTION  VARCHAR(256),
+    create_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_rule_code (rule_code)
+) ENGINE=INNODB DEFAULT CHARSET=utf8mb4 COMMENT='危险代码检测规则';
+
+-- 4. 内容审核记录表（人工审核完毕后写入；BLOCK 拦截记录也落此表）
+CREATE TABLE IF NOT EXISTS content_audit_record (
+    id               BIGINT AUTO_INCREMENT PRIMARY KEY,
+    submit_id        VARCHAR(64)  NOT NULL COMMENT '提交唯一标识',
+    user_id          BIGINT       COMMENT '提交用户ID',
+    problem_id       BIGINT       COMMENT '关联题目ID',
+    problem_no       VARCHAR(64)  COMMENT '关联题目编号',
+    content_type     VARCHAR(32)  COMMENT '内容类型: QUESTION/CODE/COMMENT',
+    LANGUAGE         VARCHAR(32),
+    risk_level       VARCHAR(16)  COMMENT 'HIGH/MEDIUM/LOW/NONE',
+    hit_details      JSON         COMMENT '命中详情',
+    total_score      INT          DEFAULT 0,
+    content_snapshot TEXT         COMMENT '内容快照（截断）',
+    pre_check_status VARCHAR(16)  COMMENT 'BLOCK/PASS',
+    audit_status     VARCHAR(16)  COMMENT 'pending/pass/reject/blocked/logonly',
+    audit_remark     VARCHAR(512),
+    auditor_id       VARCHAR(64),
+    audit_time       DATETIME,
+    es_doc_id        VARCHAR(64)  COMMENT '来源 ES 文档ID',
+    submit_time      DATETIME,
+    create_time      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_submit_id (submit_id),
+    KEY idx_audit_status (audit_status),
+    KEY idx_submit_time (submit_time)
+) ENGINE=INNODB DEFAULT CHARSET=utf8mb4 COMMENT='内容审核记录';
+
+-- 敏感词（示例库：广告/违规类，等级含义 HIGH=拦截 MEDIUM=待审 LOW=仅记录）
+INSERT INTO sensitive_word (word, category, LEVEL) VALUES
+('赌博', 'OTHER', 'HIGH'),
+('博彩', 'OTHER', 'HIGH'),
+('代考', 'ADVERTISING', 'HIGH'),
+('代写作业', 'ADVERTISING', 'HIGH'),
+('刷单', 'ADVERTISING', 'MEDIUM'),
+('外挂', 'OTHER', 'MEDIUM'),
+('翻墙', 'OTHER', 'MEDIUM'),
+('发票代开', 'ADVERTISING', 'MEDIUM'),
+('加微信', 'ADVERTISING', 'LOW'),
+('私聊接单', 'ADVERTISING', 'LOW')
+ON DUPLICATE KEY UPDATE update_time = update_time;
+
+-- 危险代码规则
+INSERT INTO dangerous_code_rule (rule_code, rule_name, LANGUAGE, rule_type, rule_content, risk_level, score, DESCRIPTION) VALUES
+('DC-001', 'Java命令执行', 'JAVA', 'REGEX', 'Runtime\\.getRuntime\\(\\)\\.exec', 'HIGH', 95, '检测 Java 执行系统命令'),
+('DC-002', 'Java进程构建', 'JAVA', 'REGEX', 'new\\s+ProcessBuilder', 'HIGH', 90, '检测 Java 进程构建器'),
+('DC-003', 'Python命令执行', 'PYTHON', 'REGEX', 'os\\.(system|popen)\\s*\\(', 'HIGH', 95, '检测 Python 执行系统命令'),
+('DC-004', 'eval动态执行', 'ALL', 'REGEX', '\\beval\\s*\\(', 'HIGH', 85, '检测 eval 动态代码执行'),
+('DC-005', '删除根目录', 'ALL', 'REGEX', 'rm\\s+-rf\\s+/', 'HIGH', 100, '检测 rm -rf / 破坏性命令'),
+('DC-006', 'Python删目录', 'PYTHON', 'REGEX', 'shutil\\.rmtree', 'HIGH', 85, '检测递归删除目录'),
+('DC-007', '反向Shell', 'ALL', 'REGEX', '/bin/(ba)?sh\\s+-i', 'HIGH', 95, '检测反弹Shell特征'),
+('DC-008', '死循环攻击', 'ALL', 'REGEX', 'while\\s*\\(\\s*true\\s*\\)\\s*\\{\\s*\\}', 'MEDIUM', 60, '检测空死循环占用CPU'),
+('DC-009', '端口扫描', 'ALL', 'REGEX', '(port|PORT)\\s*(_?)+\\d{2,5}.*for.*range', 'MEDIUM', 70, '疑似端口扫描循环'),
+('DC-010', '矿池地址', 'ALL', 'REGEX', '(stratum\\+tcp|miner|矿池)', 'HIGH', 90, '挖矿特征')
+ON DUPLICATE KEY UPDATE update_time = update_time;
+
+-- 10. 用户题解表
+DROP TABLE IF EXISTS `oj_solution`;
+CREATE TABLE `oj_solution` (
+    `id`               BIGINT         NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `problem_id`       BIGINT         NOT NULL COMMENT '题目ID',
+    `problem_title`    VARCHAR(200)   DEFAULT NULL COMMENT '题目标题冗余',
+    `user_id`          BIGINT         NOT NULL COMMENT '发布用户ID',
+    `username`         VARCHAR(100)   DEFAULT NULL COMMENT '用户名冗余',
+    `avatar`           VARCHAR(500)   DEFAULT NULL COMMENT '头像冗余',
+
+    `title`            VARCHAR(200)   NOT NULL COMMENT '题解标题',
+    `format`           VARCHAR(100)   DEFAULT NULL COMMENT '解题格式（双指针/DP/回溯等）',
+    `idea`             MEDIUMTEXT     COMMENT '思路',
+    `process`          MEDIUMTEXT     COMMENT '解题过程',
+    `complexity`       VARCHAR(500)   DEFAULT NULL COMMENT '复杂度分析',
+    `code_lang`        VARCHAR(50)    DEFAULT 'java' COMMENT '代码语言',
+    `code`             MEDIUMTEXT     COMMENT '题解代码',
+
+    `like_count`       INT            DEFAULT 0 COMMENT '点赞数',
+    `view_count`       INT            DEFAULT 0 COMMENT '观看数',
+    `comment_count`    INT            DEFAULT 0 COMMENT '评论数',
+
+    `is_passed`        TINYINT(1)     DEFAULT 0 COMMENT '是否已AC该题',
+    `is_featured`      TINYINT(1)     DEFAULT 0 COMMENT '精选置顶',
+
+    `audit_status`     VARCHAR(20)    DEFAULT 'none' COMMENT '审核状态 none/pending/blocked/passed/rejected',
+    `risk_level`       VARCHAR(10)    DEFAULT 'NONE' COMMENT '风险等级 NONE/LOW/MEDIUM/HIGH',
+    `detect_summary`   VARCHAR(1000)  DEFAULT NULL COMMENT '检测命中摘要',
+
+    `status`           VARCHAR(20)    DEFAULT 'PUBLISHED' COMMENT 'PUBLISHED/HIDDEN/DELETED',
+    `created_at`       DATETIME       DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`       DATETIME       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (`id`),
+    KEY `idx_solution_problem` (`problem_id`, `status`, `created_at` DESC),
+    KEY `idx_solution_user` (`user_id`, `created_at` DESC),
+    KEY `idx_solution_audit` (`audit_status`, `created_at` DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='OJ用户题解表';
