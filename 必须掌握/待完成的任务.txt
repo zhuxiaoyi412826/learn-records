@@ -50,3 +50,4 @@ tcpdump
 https://github.com/OpenAPITools/openapi-generator 代码生成器  mybatisplus代码生成器测试
 
 https://www.deepseek.com/harness/     claucode   codex
+neovim 和 Zed的使用
