@@ -51,3 +51,4 @@ https://github.com/OpenAPITools/openapi-generator 代码生成器  mybatisplus�
 
 https://www.deepseek.com/harness/     claucode   codex
 neovim 和 Zed的使用
+GraphQL API 的掌握和RESTFUL风格对比
