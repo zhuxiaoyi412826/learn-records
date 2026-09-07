@@ -9,7 +9,7 @@ Fiddler 软件下载 Snipaste 软件下载和使用 charles-proxy（Charles 抓�
 Githup CLI是什么  如springCLI和其他CLI
 Bitwarden 使用  Google Authenticator 下载使用
 一次同时推送仓库 GitHub+Gitee  
-PDF文件阅读 总计 翻译    有哪些
+PDF文件阅读 总计 翻译   
 常用的翻译软件和网站翻译
 多人协作开发项目 Fork 仓库 → 新建分支修改 → 提交 PR → 社区审核合并，合并后内容自动同步线上官网
 科学上网长时间 长期使用
