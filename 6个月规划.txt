@@ -20,6 +20,9 @@ JAVASE  on java
 JMC MAT  APIfox  浏览器调试 抓包工具 Githup熟练掌握  idea编辑器熟练使用  dbeaverc数据库熟练使用 blander熟练使用
 笔记本电脑刷出unbantu系统 最小化   台式电脑 32g内存 电脑桌搭配 
 
+
+
+
 非必须掌握
 跟李沫学AI 动手学深度学习v2      3blum 微积分 线性代数 深度学习 
 AI引擎综合后端，(象棋 五子棋 军旗 围棋 麻将 斗地主) 前端页面综合网站  后端AI引擎分发+AI
