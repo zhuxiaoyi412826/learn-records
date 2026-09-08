@@ -1,20 +1,50 @@
 # 学习目标
 
+## 学习要求
+
+1. **能快速搭建各种 Spring Boot 项目 理解自动配置 选场景 定制化组件 导入配置 测试** 
+
+2. **会自己debug项目，开发新功能。了解web会话管理，HTTP 等**
+
+3. **能做登录、权限、文件上传、分页、异常处理 、token 权限管理 、支付等各种业务**
+
+4. **面试能讲清自动装配、事务、Bean 生命周期等底层原理；**
+
+5. **具备整合各类中间件、配置各种数据库、部署上线、简单性能调优能力；**
+
+6. **可独立开发中小型单体后端接口项目；**
+
+7. **能看懂企业项目结构，并增加，修改功能**
+
+8. **独立搭建一套标准后台管理接口项目，包含用户、角色、权限基础模块**
+
+9. **规范分层架构：Controller / Service / Mapper / Entity / DTO / VO 分层规范，会使用API接口测试**
+
+10. **掌握开发规范：常量类、工具类封装、枚举统一管理、代码复用抽取**
+
+11. **能排查常见报错：循环依赖、事务失效、跨域、配置读取失败、连接池耗尽等线上问题**
+
+12. **性能优化方向：连接池调参、接口分页、缓存减少 DB 查询、异步处理耗时任务**
+
+13. **jdk日志分析处理，logback日志输出**
+
+    ****
+
+## 学习内容
+
 1. Spring Boot 是什么、为什么学习，怎么学习
 
-2. **项目创建**（官网 / IDEA / CLI）掌握环境搭建：Maven/Gradle 创建工程
+2. **项目创建**（官网 / IDEA / CLI）掌握环境搭建，手动搭建：Maven/Gradle 创建工程
 
 3. **理解** 自动装配、内置服务器、一键依赖管理    理解自动配置原理  
 
-4. **熟练配置文件体系**：application.yml/application.properties、多环境配置、配置优先级、自定义配置参数读取，
-
-5. 熟悉四种配置绑定 读取yml配置文件，可以读取自定义yml配置文件
+4. **配置文件体系**.yml/application.properties，多环境配置、配置优先级、自定义配置参数读取，配置绑定
 
 6. **注解大全**（`@Controller` `@Service` `@Autowired` 等） 核心注解吃透：启动注解、组件注册、依赖注入、请求映射、条件注解等常用注解作用场景
 
 7. **SpringBoot核心原理** 自动装配原理：SPI 机制、META-INF 配置文件、@EnableAutoConfiguration 流程
 
-   定制化组件 选场景  写配置 分析组件 修改配置文件                                                                                     Starter 启动器机制：理解官方 starter，能手写自定义 starter
+   定制化组件 选场景  写配置 分析组件 修改配置文件                                                                                                   Starter 启动器机制：理解官方 starter，能手写自定义 starter
 
    Bean 生命周期、Bean 作用域、循环依赖解决机制
 
@@ -27,8 +57,6 @@
 8. **接口开发**（GET / POST / 传参）数据库增删改查 分页、条件查询
 
 9. **持久层整合目标**（业务开发核心) 整合 MyBatis/MyBatis-Plus：XML 映射、注解 CRUD、分页、条件构造器 整合 JdbcTemplate、原生 JDBC、H2 内存数据库用于测试 数据源配置：单数据源、多数据源、Druid 连接池监控与参数调优事务管理：声明式事务 @Transactional、事务传播机制、隔离级别、事务失效场景
-
-10. **整合SSM** 
 
 11. **Redis 整合**：缓存读写、序列化、分布式缓存、缓存击穿 / 雪崩简单处理
 
@@ -62,7 +90,7 @@
 
     容器化基础：Docker 打包 SpringBoot 镜像、简单容器启动命令
 
-18. **扩展中间件整合目标**消息队列：RabbitMQ/Kafka 消息发送、消费者监听、可靠消息基础方案
+18. **扩展中间件整合目标**消息队列：                                                                                                                   RabbitMQ/Kafka 消息发送、消费者监听、可靠消息基础方案
 
     定时任务：@Scheduled 定时任务、线程池配置、分布式定时任务基础认知
 
@@ -74,38 +102,16 @@
 
 19. 官方文档学习
 
-    1. Springboot-GraphQL
-    2. Springboot-Restful
-    3. https://spring.io/guides/tutorials/spring-webflux-kotlin-rsocket springboot 官方聊天教程 并打包为exe和安卓，支持聊天和传输文件
-    4. Springboot-GraphQL-进阶
+    1. **Springboot-GraphQL**
+    2. **Springboot-Restful**
+    3. **https://spring.io/guides/tutorials/spring-webflux-kotlin-rsocket springboot 官方聊天教程 并打包为exe和安卓，支持聊天和传输文件**
+    4. **Springboot-GraphQL-进阶**
 
-20. 
+18. **Bean 生命周期**：实例化 → 属性填充 → Aware → 初始化三部曲 → `postProcessAfterInitialization`（AOP 代理生成点）→ 销毁；三级缓存各自存什么、为什么三级不是二级
 
-核心目标
+19. **循环依赖三大解决不了的场景**：构造器注入、prototype、Boot 2.6+ 默认禁止
 
-1. **能快速搭建各种 Spring Boot 项目 理解自动配置 选场景 定制化组件 导入配置 测试** 
-
-2. **会自己debug项目，开发新功能**
-
-3. **能做登录、权限、文件上传、分页、异常处理 、token 权限管理 、支付等各种业务**
-
-4. **面试能讲清自动装配、事务、Bean 生命周期等底层原理；**
-
-5. **具备整合各类中间件、配置各种数据库、部署上线、简单性能调优能力；**
-
-6. **可独立开发中小型单体后端接口项目；**
-
-7. **能看懂企业项目结构，并增加，修改功能**
-
-8. **独立搭建一套标准后台管理接口项目，包含用户、角色、权限基础模块**
-
-   **规范分层架构：Controller / Service / Mapper / Entity / DTO / VO 分层规范，会使用API接口测试**
-
-   **掌握开发规范：常量类、工具类封装、枚举统一管理、代码复用抽取**
-
-   **能排查常见报错：循环依赖、事务失效、跨域、配置读取失败、连接池耗尽等线上问题**
-
-   **性能优化方向：连接池调参、接口分页、缓存减少 DB 查询、异步处理耗时任务**
+20. **事务专题**：传播机制重点记 REQUIRED / REQUIRES_NEW / NESTED；**事务失效八大场景**（自调用、rollbackFor 缺失、多线程等）
 
 # springboot
 
@@ -246,7 +252,7 @@ java -jar target/pure-manual-sb-0.0.1-SNAPSHOT.jar
 
 ![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/20260907184336.png)
 
-## 快速体验
+## Mavne项目改造SpringBoot项目
 
 手动改造maven到springboot项目
 
@@ -1280,7 +1286,7 @@ APP_CHAT_TIMEOUT=1000    # 系统环境变量大写下划线
 
 > ❌不要混用：不要同一个配置，一部分 @Value，一部分 @ConfigurationProperties，维护混乱。
 
-## yml文件读取
+## 配置文件读取
 
 > 读取 SpringBoot 自动加载的 `application.yml / application‑xxx.yml`（系统配置文件）
 
@@ -2339,25 +2345,9 @@ SpringBoot Web 开发场景 **3 种配置方式**：
 
 函数式 Web 是 Spring 5.2+ 推出的无注解 Web 编程模型，用 RouterFunction 定义路由、HandlerFunction 处理请求，路由与业务分离，适配 WebFlux 响应式，代码更简洁、灵活、可测试。
 
-# 1
+# 原理
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## 4自动配置
+## 自动配置
 
 ### 1依赖管理机制
 
@@ -2507,7 +2497,7 @@ spring-boot-starter  导⼊了⼀个包  都是各种场景的 spring-boot-autoc
 
 导⼊ starter  、修改配置⽂件，就能修改底层⾏为。
 
-## 5常用注解
+## 注解
 
 SpringBoot 摒弃XML配置⽅式，改为全注解驱动
 
@@ -2548,7 +2538,7 @@ SpringBoot 摒弃XML配置⽅式，改为全注解驱动
 2、使⽤@ConfigurationProperties 声明组件和配置⽂件的哪些配置项进⾏绑定
 ```
 
-## 8 如何使用SpringBoot
+## 如何掌握SpringBoot
 
 SpringBoot框架的框架、底层基于Spring。能调整每⼀个场景的底层⾏为。100%项⽬⼀定会⽤到底层⾃定义
 
@@ -2570,9 +2560,7 @@ SpringBoot框架的框架、底层基于Spring。能调整每⼀个场景的底�
 -  需不需要⾃⼰完全定义这个组件
 -  场景定制化
 
-
-
-**最佳实战：**
+## **最佳实战：**
 
 -   选场景，导⼊到项⽬ 官⽅：starter 第三⽅：去仓库搜
 -  写配置，改配置⽂件关键项 数据库参数（连接地址、账号密码...）
@@ -2580,7 +2568,7 @@ SpringBoot框架的框架、底层基于Spring。能调整每⼀个场景的底�
 -  不满意boot提供的⾃动配好的默认组件
 -  定制化 改配置 ⾃定义组件
 
-**整合redis**
+## **整合redis**
 
 1. 选场景：  spring-boot-starter-data-redis   场景AutoConfiguration 就是这个场景的⾃动配置类 
 2. 写配置：  分析到这个场景的⾃动配置类开启了哪些属性绑定关系 @EnableConfigurationProperties(RedisProperties.class)  修改redis相关的配置 
@@ -2589,26 +2577,79 @@ SpringBoot框架的框架、底层基于Spring。能调整每⼀个场景的底�
 
 # 场景整合
 
-## 响应式编程
+## 接口层开发
 
-# Reactive Stack  Servlet Stack
+## 持久层开发
 
-https://docs.spring.io/spring-framework/docs/6.0.0/reference/html/web-reactive.html#webflux
+## SSM整合
 
-Reactive Stack（响应式技术栈）是一套用于构建响应式应用的技术组合，其核心思想是基于异步、非阻塞和事件驱动的编程模型，能够更好地处理高并发、高吞吐量的场景，并提供更流畅的用户体验。以下是关于它的详细介绍
+## knif4j文档
+
+## Restful
+
+## GrapQL
+
+## 全局设置
+
+参数接收、统一返回格式、页面跳转 统一返回结果 + 全局异常处理+分页插件、逻辑删除、自动填充速查
+
+## Redis
+
+## AI会话
+
+## logback
+
+## Sa‑Token
+
+## cookie session jwt-token
+
+## SSM+Redis+AI 商品项目
+
+## 线上问题排查
+
+![image-20260908210433139](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20260908210433139.png)
+
+上面这张图是排障的骨架：**故障发生 → 先止血留现场 → 按四类现象分诊 → 工具定位 → 复盘**。线上生产会遇到的问题，归纳起来就八大类：
+
+| 类别         | 典型现象                      | 头号根因                                              |
+| :----------- | :---------------------------- | :---------------------------------------------------- |
+| **启动类**   | 起不来、卡住                  | 端口占用、循环依赖、依赖冲突（`NoSuchMethodError`）   |
+| **内存类**   | OOM、越跑越慢                 | 全表查询不分页、缓存无上限、ThreadLocal 泄漏          |
+| **CPU 类**   | CPU 100%                      | 死循环、频繁 Full GC、正则灾难回溯                    |
+| **数据库类** | 连接池耗尽、慢接口            | 慢 SQL 占连接、连接泄漏、索引失效（**线上占比最高**） |
+| **缓存类**   | Redis 超时、不一致            | 大 key、热 key、生产误用 `keys *`                     |
+| **接口性能** | 超时、503                     | 外部调用没设超时 → 线程堆积雪崩                       |
+| **业务并发** | 超卖、重复扣款                | 无锁并发、缺幂等                                      |
+| **环境运维** | 时区差8小时、磁盘满、容器被杀 | 容器 UTC 时区、日志未切割、JVM 超容器内存             |
+
+三个最容易踩的坑提醒：
+
+1. **重启前先留现场**——`jstack` + `jmap -dump` 十秒钟的事，重启后证据全没了；OOM 则提前配 `HeapDumpOnOutOfMemoryError` 兜底。
+2. **CPU 高先看抓到的是业务线程还是 GC 线程**——后者是内存问题，方向完全不同，别在代码里白找死循环。
+3. **调大连接池/线程池只是止血不是治疗**——`HikariPool connection is not available` 必须用 `leak-detection-threshold` 或 `show processlist` 找到占连接的元凶。
+
+# 项目规范
+
+# RAG智能客服实战
+
+# 聊天项目智能实战
+
+# Reactive Stack
+
+> Reactive Stack（响应式技术栈）是一套用于构建响应式应用的技术组合，其核心思想是基于异步、非阻塞和事件驱动的编程模型，能够更好地处理高并发、高吞吐量的场景，并提供更流畅的用户体验。以下是关于它的详细介绍
 
 - **响应性**：系统对请求及时响应。
 - **弹性**：系统在出现故障时仍能保持响应。
 - **伸缩性**：系统在不同工作负载下能保持响应。
 - **消息驱动**：通过异步消息传递实现组件解耦
 
-“Servlet Stack”（Servlet 技术栈）是 Java EE（现 Jakarta EE）平台的传统 Web 开发模型，基于**Servlet API**构建，是早期 Java Web 应用的核心技术栈。它采用**同步阻塞**的编程模型，通过 Servlet 容器（如 Tomcat、Jetty）处理 HTTP 请求。以下是关于它的详细介绍：
+[文档](https://docs.spring.io/spring-framework/docs/6.0.0/reference/html/web-reactive.html#webflux)
+
+> “Servlet Stack”（Servlet 技术栈）是 Java EE（现 Jakarta EE）平台的传统 Web 开发模型，基于**Servlet API**构建，是早期 Java Web 应用的核心技术栈。它采用**同步阻塞**的编程模型，通过 Servlet 容器（如 Tomcat、Jetty）处理 HTTP 请求。以下是关于它的详细介绍：
 
 ## **一、Servlet 基础概念**
 
 **Servlet**是 Java 中处理 Web 请求的组件，本质是实现了`javax.servlet.Servlet`接口的 Java 类。Servlet 容器（如 Tomcat）负责：
-
-
 
 - 加载和管理 Servlet 生命周期。
 - 将 HTTP 请求映射到对应的 Servlet。
@@ -2620,12 +2661,10 @@ Reactive Stack（响应式技术栈）是一套用于构建响应式应用的技
 
 - Servlet API
 
-  ：
-
   - `HttpServlet`：处理 HTTP 请求的基类，提供`doGet()`、`doPost()`等方法。
-  - `ServletContext`：代表 Web 应用的上下文，用于共享应用范围的数据。
+- `ServletContext`：代表 Web 应用的上下文，用于共享应用范围的数据。
   - `HttpSession`：管理用户会话状态。
-
+  
 - **JSP（JavaServer Pages）**：动态生成 HTML 的模板技术，本质是 Servlet 的语法糖。
 
 - **Filter**：预处理请求或后处理响应（如编码过滤、权限验证）。
@@ -2671,8 +2710,6 @@ Reactive Stack（响应式技术栈）是一套用于构建响应式应用的技
 - **扩展性差**：难以应对海量并发（如百万级连接），需依赖硬件扩展。
 - **开发效率低**：JSP 混合 Java 代码和 HTML，维护成本高；异步处理复杂（需手动管理线程）
 
-
-
 ## **五、Servlet Stack 与 Reactive Stack 的对比**
 
 | **维度**     | **Servlet Stack（同步阻塞）**                     | **Reactive Stack（异步非阻塞）**                    |
@@ -2682,3 +2719,5 @@ Reactive Stack（响应式技术栈）是一套用于构建响应式应用的技
 | **资源消耗** | 高并发时线程上下文切换开销大                      | 资源利用率高，适合 I/O 密集型场景                   |
 | **异步支持** | 需要额外配置（如 Servlet 3.0 异步特性）           | 原生支持异步流（如 Spring WebFlux）                 |
 | **典型场景** | 中小型 Web 应用、企业内部系统                     | 高并发 API、实时数据流处理、微服务网关              |
+
+# Reactive Stack 项目实战

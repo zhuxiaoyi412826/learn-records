@@ -2029,9 +2029,11 @@ CanCommit→PreCommit→DoCommit，解决部分阻塞；依然有一致性问题
 
 ## 并发
 
+## 数据库
+
 ## 系统设计
 
-#### 2.1 系统设计方法论
+### 系统设计方法论
 
 1. **需求澄清**：功能需求 + 非功能需求（QPS、DAU、延迟、可用性、数据量）
 2. **顶层设计**：整体架构图、核心模块、数据流
@@ -2039,7 +2041,7 @@ CanCommit→PreCommit→DoCommit，解决部分阻塞；依然有一致性问题
 4. **瓶颈分析**：性能瓶颈、单点故障、扩展性瓶颈
 5. **优化方案**：缓存、异步、分片、扩容、降级
 
-#### 2.2 必掌握的核心系统设计题
+### 2.2 必掌握的核心系统设计题
 
 | 题目                 | 核心考察点                                                  |
 | -------------------- | ----------------------------------------------------------- |
@@ -2054,7 +2056,7 @@ CanCommit→PreCommit→DoCommit，解决部分阻塞；依然有一致性问题
 | 设计 RAG 知识库      | 文档处理→向量化→检索→生成→评估，全链路设计                  |
 | 设计分布式 ID 生成器 | 雪花算法、号段模式、数据库自增、UUID、Redis 自增            |
 
-#### 2.3 通用架构设计原则
+### 通用架构设计原则
 
 - 高可用：冗余、故障转移、熔断降级、限流隔离
 - 高性能：缓存、异步、并行、就近访问、读写分离
@@ -2136,17 +2138,13 @@ CanCommit→PreCommit→DoCommit，解决部分阻塞；依然有一致性问题
 
 # 实战
 
-## JavaFX
-
-## 魂斗罗游戏
+## javafx魂斗罗游戏
 
 ## 题目抽卡项目实战
 
-Javase+vue 
-
 ## SPringBoot项目实战
 
-### 0.功能实现
+### 功能实现
 
 1. 把你现有的 CRUD 项目升级为企业级标准项目：
 
@@ -2162,50 +2160,6 @@ Javase+vue
 - [ ] 日志配置 + MDC 链路 ID
 - [ ] 接口文档（Knife4j / SpringDoc）
 - [ ] 单元测试（JUnit5 + Mockito）
-
-2. #### 4. 项目中的应用
-
-   - 异步解耦：用户注册后异步发送短信/邮件
-   - 日志收集：操作日志异步写入数据库
-   - 订单超时取消：延迟消息实现
-   - 流量削峰：秒杀场景下订单异步处理
-
-   #### 5. 最佳实践
-
-   - 消息幂等性：如何保证消息不重复消费
-     - 数据库唯一索引
-     - Redis 去重
-     - 状态机判断
-   - 消息可靠性：
-     - 生产者确认机制
-     - 消费者手动 ACK
-     - 持久化配置
-
-   3. 做一个完整的 AI 应用项目，包含以下功能：
-
-      - [ ] 智能对话：流式对话、多轮对话、对话历史
-      - [ ] 图片生成：文生图、图片保存、我的作品
-      - [ ] 图片理解：上传图片提问
-      - [ ] 视频生成：文生视频、异步任务、状态查询
-      - [ ] 知识库问答：
-        - [ ] 文档上传（PDF/Word/Markdown）
-        - [ ] 文档解析与向量化
-        - [ ] 语义检索问答
-        - [ ] 引用溯源
-      - [ ] 我的助手：创建自定义 AI 助手（设定人设、提示词）
-      - [ ] 用户系统：注册登录、积分/额度管理
-      - [ ] 管理后台：用户管理、模型配置、知识库管理
-
-   4. ### 前端实战
-
-      - 登录注册页面
-      - 后台管理系统布局（侧边栏 + 顶栏 + 主内容区）
-      - 用户管理 CRUD 页面
-      - 角色权限管理
-      - 图表展示：ECharts
-      - AI 对话页面（流式输出、打字机效果）
-      - 图片生成页面
-      - 知识库管理页面
 
 ### 1. 项目定位
 
@@ -2226,6 +2180,7 @@ Javase+vue
 | 工具组件   | Hutool、Lombok、Apache Commons                        |
 | 文件存储   | 本地存储 + 阿里云 OSS 兼容方案                        |
 | 部署方式   | Docker + Docker Compose                               |
+| SPringleAI | 1.1x                                                  |
 
 ### 3. 核心业务模块
 
@@ -2470,6 +2425,8 @@ Javase+vue
 
 # 额外学习内容
 
+## java函数式编程
+
 ## springcloudalibaba
 
 1. **Nacos**：集注册中心 + 配置中心于一体，服务注册发现、动态配置管理。
@@ -2483,29 +2440,29 @@ Javase+vue
 
 ## Kubernetes
 
-#### 3.1 Kubernetes 核心概念
+####  Kubernetes 核心概念
 
 - 架构：Master 节点（API Server、Controller Manager、Scheduler、etcd）+ Node 节点（Kubelet、Kube-proxy、Container Runtime）
 - 核心资源：Pod、Deployment、Service、Namespace、ConfigMap、Secret、Volume
 - 工作负载：Deployment（无状态）、StatefulSet（有状态）、DaemonSet、Job/CronJob
 
-#### 3.2 服务网络与存储
+####  服务网络与存储
 
 - Service 类型：ClusterIP、NodePort、LoadBalancer、ExternalName
 - Ingress：Nginx Ingress Controller、域名路由、HTTPS 配置
 - 存储：PV、PVC、StorageClass、常见存储插件
 
-#### 3.3 配置与安全
+####  配置与安全
 
 - ConfigMap / Secret 的使用方式
 - RBAC 权限控制：Role、ClusterRole、RoleBinding
 - ServiceAccount
 
-#### 3.4 Helm 包管理
+#### Helm 包管理
 
 - Chart 结构、常用命令、自定义模板
 
-#### 3.5 实践操作
+#### 实践操作
 
 - 本地集群：Minikube / Kind
 - kubectl 常用命令
@@ -2514,46 +2471,15 @@ Javase+vue
 
 ## CI/CD流水线实战
 
-- 完整技术栈：Git/GitLab → WebHook → Jenkins Pipeline → Maven 构建 → SonarQube 代码检测 → Docker 镜像构建 → Harbor 镜像仓库 → Docker/K8s 部署
-- 具体掌握：
-  - Jenkins 安装与插件配置、凭据管理
-  - Jenkinsfile 声明式流水线编写、多阶段划分
-  - WebHook 触发配置、参数化构建
-  - SonarQube 质量门禁集成、不通过阻断流水线
-  - Docker 镜像自动化构建与推送、版本号管理
-  - 部署阶段：远程服务器执行脚本更新容器、滚动发布
-  - 流水线通知：构建结果邮件 / 企业微信推送
+Git‑GitLab + WebHook + Jenkins Pipeline + Maven + SonarQube + 静态漏洞分析 + Docker + Harbor + K8s 部署
 
-## EFKS
+## EFKBstat
 
 - - **Elasticsearch**：分布式存储与检索、索引设计、分片副本、查询优化
   - **Filebeat/Fluentd**：日志采集、多行日志合并、字段解析、过滤清洗
   - **Kafka**：日志缓冲削峰、解耦采集与存储、消费积压处理
   - **Kibana**：日志查询、可视化仪表盘、告警配置、索引模式管理
-- 完整数据流：应用输出日志 → Filebeat 采集 → Kafka 缓冲 → Logstash/Fluentd 清洗 → Elasticsearch 存储 → Kibana 可视化
-- 实战落地：微服务链路追踪集成、错误日志告警、日志分级、全链路日志排查
-
-### ES
-
-#### 7.1 基础概念
-
-- 索引（Index）、文档（Document）、字段（Field）、映射（Mapping）
-- 分片（Shard）、副本（Replica）、节点（Node）、集群（Cluster）
-- 倒排索引原理：分词 → 词项字典 → 倒排列表
-
-#### 7.2 核心操作
-
-- DSL 查询：match、term、range、bool（must/should/must_not/filter）
-- 聚合查询：terms 分组、avg/sum 度量、date_histogram 日期直方图
-- 分页：from+size（浅分页）、search_after（深分页）、scroll（批量导出）
-
-#### 7.3 进阶知识
-
-- 分词器：IK 分词器、自定义词典
-- 索引优化：分片数规划、mapping 设计、refresh_interval 调整
-- 集群架构：节点角色（Master/Data/Ingest/Coordinating）
-- 性能优化：批量写入、路由优化、缓存策略
-- 与 MySQL 数据同步：Logstash、Canal、Flink CDC
+- 完整数据流：应用输出日志 → Filebeat 采集 → Kafka 缓冲 → Logstash/Fluentd 清洗 → Elasticsearch 存储 → Kibana 可视
 
 ## 中间件
 
@@ -2567,8 +2493,6 @@ Javase+vue
 | **Pulsar**   | 存算分离架构，支持多租户，云原生                            | 大规模消息、流批一体             |
 | **ActiveMQ** | Java 老牌 MQ，支持多种协议                                  | 传统企业集成、遗留系统           |
 
-### EFK日志
-
 ### 缓存
 
 | 中间件        | 特点                                       | 适用场景                              |
@@ -2578,9 +2502,13 @@ Javase+vue
 | **Caffeine**  | JVM 本地缓存，高性能，支持多种过期策略     | 进程内一级缓存、与 Redis 组成多级缓存 |
 | **Ehcache**   | Java 老牌本地缓存，支持持久化              | 单体应用、Hibernate 二级缓存          |
 
+### 分库分表
+
 ## 框架源码
 
 黑马程序员 spring高级原理
+
+## 系统优化
 
 ## 系统架构
 
@@ -2634,8 +2562,6 @@ DFA
 
 ## 框架
 
-java函数式编程
-
 ## 中间件
 
 1. **消息代理**：RabbitMQ、Kafka，用于服务异步解耦、流量削峰
@@ -2659,8 +2585,6 @@ shell
 - 浏览器的运行机制
 
 ## AI
-
-ZOMI酱部分系列视频 
 
 跟李沫学AI 动手学深度学习v2  
 
@@ -2686,7 +2610,7 @@ ZOMI酱部分系列视频
 
 [算法导论](https://sites.math.rutgers.edu/~ajl213/CLRS/CLRS.html)
 
-   onjava
+   [onjava](https://github.com/BruceEckel/OnJava8-Examples)
 
 [凤凰架构](https://icyfenix.cn/)
 
@@ -2697,7 +2621,3 @@ ZOMI酱部分系列视频
 查询论文网站
 
 https://arxiv.org/
-
-1000张论文
-
-https://github.com/0voice/computer_expert_paper
