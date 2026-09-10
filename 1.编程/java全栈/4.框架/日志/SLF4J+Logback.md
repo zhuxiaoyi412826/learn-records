@@ -1,8 +1,43 @@
 # SLF4J + Logback 日志框架使用文档
 
+**Logback 是 Java 生态最常用的日志实现框架，由 log4j 原作者开发，SpringBoot 默认自带的日志底层实现。**
+
+> 配套门面：`slf4j`（日志门面，统一日志 API），组合：**SLF4J + Logback**
+
+[文档](https://logback.qos.ch/manual/index.html)
+
 ## 1. 概述
 
-本项目使用 **SLF4J（Simple Logging Facade for Java）** 作为日志门面框架，**Logback** 作为底层实现。SLF4J 提供统一的日志 API，Logback 负责实际的日志输出和管理。
+> 本项目使用 **SLF4J（Simple Logging Facade for Java）** 作为日志门面框架，**Logback** 作为底层实现。SLF4J 提供统一的日志 API，Logback 负责实际的日志输出和管理。
+
+- `logback-core`：核心基础
+- `logback-classic`：对接 SLF4J（日常项目必引）
+- `logback-access`：web 容器访问日志（很少用）
+
+3. 三大核心组件
+
+| 组件           | 作用                                                         |
+| -------------- | ------------------------------------------------------------ |
+| Logger         | 日志记录器，写代码`log.info()`，控制**日志级别**，存在继承关系 |
+| Appender       | 输出目的地：控制台、文件、数据库、kafka                      |
+| Encoder/Layout | 日志格式化，定义一行日志长什么样                             |
+
+**输出目标（Appender）**
+
+- `ConsoleAppender`：控制台打印（开发环境）
+- `FileAppender / RollingFileAppender`：写入文件、**按大小 / 时间滚动切割日志**（生产常用，避免单个日志文件无限变大）
+
+**配置文件**
+
+默认读取：`logback.xml` / `logback-spring.xml`（推荐后者，支持 Spring 环境变量） 可以配置：日志级别、格式、保存路径、日志保留天数、滚动策略、异步输出。
+
+**日志级别（从低到高）**
+
+```
+TRACE` < `DEBUG` < `INFO` < `WARN` < `ERROR
+```
+
+> 设为 INFO 时，TRACE、DEBUG 不会输出
 
 ### 1.1 依赖说明
 
@@ -15,6 +50,14 @@ Spring Boot 默认已集成 `spring-boot-starter-logging`，包含：
 
 ### 1.2 配置文件位置
 
+**配置文件加载顺序**
+
+> 区别：`logback.xml`加载时机早，不能读取 Spring 环境变量；`logback-spring.xml`是 Spring 容器加载后解析，支持`<springProfile>`、`<springProperty>`。
+
+1. `logback-test.xml`（单元测试优先）
+2. `logback.xml`
+3. `logback-spring.xml`（✅ SpringBoot 推荐，可以使用 springProfile 多环境）
+
 ```
 AlgoVize/houduan/src/main/resources/logback-spring.xml
 ```
@@ -23,62 +66,138 @@ Spring Boot 启动时会自动加载 `logback-spring.xml`。
 
 ```
 <?xml version="1.0" encoding="UTF-8"?>
-<configuration>
+<configuration scan="true" scanPeriod="60 seconds" debug="false">
+    <!-- 定义日志根目录 -->
+    <property name="LOG_HOME" value="D:/lianxishi-rizi"/>
+    <!-- 通用日志pattern：满足5问：谁、在哪、做什么、结果、耗时 -->
+    <property name="COMMON_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %X{traceId:-} %X{userId:-} %logger{36}.%M - %msg cost:%d{ms}%n"/>
 
-    <property name="LOG_PATH" value="D:/rizi"/>
-    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
-
-    <!-- 控制台输出 Appender -->
+    <!-- 控制台输出：DEBUG级别 -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>${LOG_PATTERN}</pattern>
+            <pattern>${COMMON_PATTERN}</pattern>
             <charset>UTF-8</charset>
         </encoder>
     </appender>
 
-    <!-- INFO 日志 Appender -->
-    <appender name="INFO_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOG_PATH}/info.log</file>
-        <createDirs>true</createDirs>
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>INFO</level>
-        </filter>
+    <!-- DEBUG.log 文件：和控制台同DEBUG日志，重启清空 -->
+    <appender name="DEBUG_FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${LOG_HOME}/DEBUG.log</file>
+        <!-- 重启清空文件 -->
+        <append>false</append>
         <encoder>
-            <pattern>${LOG_PATTERN}</pattern>
+            <pattern>${COMMON_PATTERN}</pattern>
             <charset>UTF-8</charset>
         </encoder>
-        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
-            <fileNamePattern>${LOG_PATH}/info-%i.log</fileNamePattern>
-            <minIndex>1</minIndex>
-            <maxIndex>99999</maxIndex>
-        </rollingPolicy>
-        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
-            <maxFileSize>1MB</maxFileSize>
-        </triggeringPolicy>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>DEBUG</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
     </appender>
 
-    <!-- ERROR 日志 Appender -->
+    <!-- INFO 文件：双切割 按天+100M，滚动命名 info-yyyy-MM-dd.0.log -->
+    <appender name="INFO_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/info.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/info-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <!-- 保留天数按需自行调整 -->
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${COMMON_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>INFO</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+    </appender>
+
+    <!-- WARN 文件 -->
+    <appender name="WARN_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/warn.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/warn-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${COMMON_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>WARN</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+    </appender>
+
+    <!-- ERROR 文件 -->
     <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOG_PATH}/error.log</file>
-        <createDirs>true</createDirs>
+        <file>${LOG_HOME}/error.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/error-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${COMMON_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
         <filter class="ch.qos.logback.classic.filter.LevelFilter">
             <level>ERROR</level>
             <onMatch>ACCEPT</onMatch>
             <onMismatch>DENY</onMismatch>
         </filter>
+    </appender>
+
+    <!-- 慢SQL独立Appender BF-xxx-slow.日期.0.log -->
+    <appender name="SLOW_SQL_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/BF-slow.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/BF-%d{yyyyMMddHHmmss}-slow.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>60</maxHistory>
+        </rollingPolicy>
         <encoder>
-            <pattern>${LOG_PATTERN}</pattern>
+            <pattern>${COMMON_PATTERN}</pattern>
             <charset>UTF-8</charset>
         </encoder>
-        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
-            <fileNamePattern>${LOG_PATH}/error-%i.log</fileNamePattern>
-            <minIndex>1</minIndex>
-            <maxIndex>99999</maxIndex>
-        </rollingPolicy>
-        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
-            <maxFileSize>1MB</maxFileSize>
-        </triggeringPolicy>
+        <!-- 只捕获慢SQL logger，在mybatis-plus/mybatis配置指定logger name -->
+        <filter class="ch.qos.logback.classic.filter.LoggerNameFilter">
+            <loggerName>slowSqlLogger</loggerName>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
     </appender>
+
+    <!-- 根日志级别 DEBUG，绑定所有appender -->
+    <root level="DEBUG">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="DEBUG_FILE"/>
+        <appender-ref ref="INFO_FILE"/>
+        <appender-ref ref="WARN_FILE"/>
+        <appender-ref ref="ERROR_FILE"/>
+        <appender-ref ref="SLOW_SQL_FILE"/>
+    </root>
+
+    <!-- 单独定义慢SQL logger，mybatis慢sql输出到slowSqlLogger -->
+    <logger name="slowSqlLogger" level="INFO" additivity="false">
+        <appender-ref ref="SLOW_SQL_FILE"/>
+    </logger>
+</configuration>
+
 
     <!-- Spring Profile 配置 -->
     <springProfile name="!prod">
@@ -108,8 +227,6 @@ Spring Boot 启动时会自动加载 `logback-spring.xml`。
 </configuration>
 
 ```
-
-
 
 ---
 
@@ -159,7 +276,51 @@ D:/rizi/
 
 ---
 
-## 3. 在代码中使用日志
+### 2.5XML文件解析
+
+**XML标签解析**
+
+| 标签                         | 说明                                                         |
+| ---------------------------- | ------------------------------------------------------------ |
+| scan="true"                  | true：logback 会定时监测 `logback-spring.xml` 文件；**文件修改后自动重新加载配置，无需重启服务**false：只在项目启动时读取一次，修改 xml 不生效 |
+| scanPeriod="60 seconds"      | 配置文件扫描周期                                             |
+| debug="false"                | true：输出 logback 框架本身加载、appender 初始化、过滤器、滚动策略等内部日志，**排查 logback 配置错误时临时打开**false：关闭框架内部日志（生产必须 false，避免大量额外噪音） |
+| `<property>`                 | 定义变量，${name} 引用    ${value}                           |
+| `<springProperty>`           | 读取 application.yml 里的配置（logback-spring.xml 专属）     |
+| `<appender>`                 | 日志输出器，name 唯一                                        |
+| `<rollingPolicy>`            | 滚动策略TimeBasedRollingPolicy：按天SizeAndTimeBasedRollingPolicy：时间 + 大小双限制 |
+| `<filter>`                   | 过滤器，按级别过滤日志                                       |
+| `<logger name="包名">`       | 单独设置某个包的日志级别additivity="false"：日志不向上传递到 root |
+| `<root>`                     | 全局根日志，所有日志最终都会走到 root                        |
+| `<springProfile name="dev">` | 多环境区分，logback-spring.xml 独有                          |
+| ConsoleAppender              | **控制台输出器**，日志打印到 IDEA /cmd/powershell 的黑框控制台 |
+| <encoder>                    | **把日志事件（时间、线程、日志内容、异常堆栈）组装成一行文本字符串**，同时处理字符编码 |
+| <pattern>                    | 引用前面用`<property>`定义的日志格式变量。 pattern 就是**日志行模板**，决定打印出来的日志长什么样 |
+
+**占位符**
+
+```
+%d{yyyy-MM-dd HH:mm:ss.SSS}  时间
+[%thread]                   线程名称
+%-5level                    日志级别，占5字符左对齐
+%logger{36}                 类名，最多36字符
+%msg                        日志消息
+%n                          换行
+%X{traceId}                 MDC链路追踪ID（sleuth/skywalking）
+%wEx                        打印异常堆栈
+```
+
+**示例** %d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n
+
+**输出** 2026-09-10 14:30:22.123 [http-nio-8080-exec-1] INFO  com.example.UserService - 用户登录成功
+
+**异步日志 AsyncAppender**
+
+**MDC 链路追踪（TraceId）**
+
+> MDC = Mapped Diagnostic Context，在线程上绑定自定义变量（traceId），日志自动打印
+
+## 3. SLF4J使用
 
 ### 3.1 方式一：SLF4J 原生写法（推荐）
 
@@ -471,7 +632,34 @@ POST /actuator/loggers/com.algoviz
 
 ---
 
-## 9. 最佳实践
+## 9.MDC
+
+（满足你的需求：traceId、userId，日志模板`%X{traceId}`读取）
+
+MDC = 线程上下文，**同线程内全局携带**，AOP 接口出入口放，请求结束清理。
+
+## 10. 最佳实践
+
+### 常见问题
+
+1. **logback.xml 不能读取 spring 变量**：改用`logback-spring.xml`
+2. 日志重复打印：`<logger>`标签忘记写`additivity="false"`，日志向上传递到 root，输出多次
+3. 磁盘打满：忘记配置`maxHistory`、`totalSizeCap`，日志无限堆积
+4. 异步日志丢日志：`discardingThreshold>0`，队列满丢弃低级别日志
+5. 中文乱码：encoder 指定`charset>UTF-8`
+6. 异常堆栈不输出：pattern 缺少`%wEx`
+
+### 生产实践
+
+1. 使用 `logback-spring.xml`
+2. 区分控制台（dev）、文件输出（prod）
+3. 业务日志 + 独立 error 日志
+4. 开启异步 Appender 提升性能
+5. 设置保留天数、总容量上限，防止磁盘爆满
+6. 接入 MDC 打印 traceId，链路追踪
+7. 第三方包（spring、mybatis）级别设置为 WARN，减少无效日志
+8. 开启`<configuration debug="true">`，查看 logback 自身加载日志
+9. 使用`StatusPrinter.print()`打印内部状态（代码调试）
 
 ### ✅ 应该做的
 
@@ -506,7 +694,7 @@ logger.info("用户登录，密码长度：{}", password.length());
 
 ---
 
-## 10. 故障排查
+## 11. 故障排查
 
 ### Q1：日志文件没有生成？
 
@@ -540,7 +728,7 @@ logger.info("用户登录，密码长度：{}", password.length());
 
 ---
 
-## 11. 快速参考卡
+## 12. 快速参考卡
 
 ```java
 // Logger 声明
@@ -559,3 +747,45 @@ log.error("错误：{}", value, e);   // 错误（带异常堆栈）
 // 切割：1MB 序号归档
 // 级别：info.log(INFO+) / error.log(仅ERROR)
 ```
+
+## 13.AI生成模板
+
+### 基础信息
+
+- 文件：`resources/logback-spring.xml`（SpringBoot 专属，可读取 spring 配置）
+- 日志根目录：`D:\lianxishi-rizi`
+- 日志规范：每条日志要回答 5 个问题：**谁 (traceId/userId)、在哪 (类 + 方法)、做了什么 (脱敏入参)、结果如何 (返回 / 异常)、耗时 (ms)**
+- 代码埋点规范（8 类日志场景）
+  | # | 位置 | 级别 | 必含信息 |
+
+|---|---|---|---|
+|1 | 接口出入口 (AOP 统一打印)|INFO|URL、脱敏入参、返回码、耗时 |
+|2 | 业务关键节点 | INFO | 状态流转、业务主键 orderId|
+|3 | 外部调用 (出方向)|INFO/WARN | 参数、响应码、耗时、重试次数 |
+|4 | 第三方回调 (入方向)|INFO | 回调参数、验签结果（纠纷证据）|
+|5 | 异常 | ERROR | 堆栈、业务上下文 |
+|6 | 降级 / 自愈 | WARN | 重试成功、兜底触发 |
+|7|MQ 消费 / 定时任务 | INFO | 开始、结束、处理条数、失败重试 |
+|8 | 安全审计 | WARN | 登录失败、越权尝试、敏感操作 |
+
+### 文件输出规则
+
+1. **info.log**：当日 INFO 日志；滚动文件命名 `info-日期.0.log`，单文件上限 100M，按天 + 大小双切割
+2. **warn.log**：当日 WARN 日志；滚动文件命名 `warn-日期.0.log`，单文件上限 100M，按天 + 大小双切割
+3. **error.log**：当日 ERROR 日志；滚动文件命名 `error-日期.0.log`，单文件上限 100M，按天 + 大小双切割
+4. **DEBUG.log**：控制台 DEBUG 级别日志同步写入此文件；**应用重启自动清空 DEBUG.log**
+5. **慢 SQL 日志**：独立 Appender，文件名模板 `BF-202607031052-slow.2026-09-07.0.log`，按天切割，新文件输出
+
+### 日志 Pattern（适配 5 问：traceId, 类名 + 方法，耗时）
+
+```
+%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %X{traceId:-} %X{userId:-} %logger{36}.%M - %msg cost:%d{ms}%n
+```
+
+> 字段说明：
+>
+>
+> - `%X{traceId:-}` MDC 链路 ID
+> - `%X{userId:-}` MDC 用户 ID
+> - `%logger{36}.%M` 类名。方法名
+> - `cost:%d{ms}` 耗时毫秒（业务代码放入 MDC）

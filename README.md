@@ -1016,70 +1016,6 @@
 - 监控与运维：Actuator 端点、Spring Boot Admin
 - 异常处理、拦截器、跨域配置的最佳实践
 
-### 基础
-
-**0. 项目搭建与配置**
-
-- 快速创建 Spring Boot 项目（Spring Initializr / IDEA）
-- `application.yml` / `application.properties` 配置文件
-- 多环境配置：dev / test / prod 切换
-- 常用 Starter 引入（web、validation、redis、mybatis-plus 等）
-
-**1. Web 开发**
-
-- `@RestController`、`@RequestMapping`、`@GetMapping`、`@PostMapping`
-- 参数接收：`@RequestParam`、`@PathVariable`、`@RequestBody`、`@RequestHeader`
-- 统一返回格式：`Result<T>` 封装
-- 全局异常处理：`@RestControllerAdvice` + `@ExceptionHandler`
-- 参数校验：`@Valid` + `@NotBlank` + `@Length` + `@Email`
-- 日期处理：`@DateTimeFormat`、`@JsonFormat`
-- 文件上传下载：`MultipartFile`
-- 跨域配置：CORS
-
-**2. 常用注解**
-
-- `@Component`、`@Configuration`、`@Bean`
-- `@Value`、`@ConfigurationProperties`（配置绑定）
-- `@Transactional`（事务）
-- `@Slf4j`（Lombok 日志）
-
-**3. 分层架构**
-
-- Controller / Service / Mapper / Entity 四层结构
-- Service 接口 + 实现类的写法
-- `@Service`、`@Autowired`、`@Resource`
-
-**4. 项目规范**
-
-- VO / DTO / Query / BO 分层
-- MapStruct 对象转换（替代 BeanUtils）
-- 自定义业务异常 + 错误码枚举
-- 日志规范 + MDC 链路追踪 ID
-
-**5. 接口文档**
-
-- Knife4j / SpringDoc OpenAPI 配置与使用
-- 常用注解：`@ApiOperation`、`@ApiModel`
-
-**6. 单元测试**
-
-- JUnit5 + Mockito
-- `@SpringBootTest` 测试 Service 层
-
-**7. 打包部署**
-
-- jar 包 / war 包
-- 外置 Tomcat 部署
-- 启动脚本编写
-
-**8. 日志**
-
-- SLF4J + Logback 基本使用
-- `log.info()`、`log.error()` 打日志
-- 日志级别配置
-
-### 进阶
-
 #### 1. 自动配置原理（面试必问）
 
 - `@SpringBootApplication` 注解拆解
@@ -1100,7 +1036,7 @@
 - 监听器机制：ApplicationListener、SpringApplicationRunListener
 - 启动过程中如何扩展：CommandLineRunner、ApplicationRunner
 
-#### 3. 配置管理深化
+#### 3. 配置文件管理读取
 
 - 配置文件优先级：命令行 > 环境变量 > application.yml > application.properties
 - 多环境配置：`application-dev.yml`、`application-prod.yml`、如何切换
@@ -1108,7 +1044,7 @@
 - 配置元数据：`additional-spring-configuration-metadata.json`
 - 类型安全的配置属性
 
-#### 4. Web 开发深化
+#### 4. Web 开发
 
 - Spring MVC 自动配置：DispatcherServlet、ViewResolver、消息转换器
 - 拦截器 vs 过滤器：区别、执行顺序、适用场景
@@ -1119,7 +1055,7 @@
 - 文件上传下载：MultipartFile、大文件分片上传
 - 跨域配置：`@CrossOrigin`、全局 CORS 配置、网关层跨域
 
-#### 5. 事务管理深化
+#### 5. 事务管理
 
 - `@Transactional` 事务原理：AOP 动态代理
 - 事务传播行为：7 种传播机制，重点掌握 REQUIRED、REQUIRES_NEW、NESTED
@@ -1136,6 +1072,10 @@
   9. 大事务问题
   10. 嵌套事务踩坑
 - 编程式事务：TransactionTemplate
+
+### 6.场景导入
+
+
 
 ## 6. Spring AI
 

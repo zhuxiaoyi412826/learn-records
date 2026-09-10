@@ -1,8 +1,10 @@
 # 互联网企业 SpringBoot 项目开发规范
 
-> 以一个标准的互联网企业 SpringBoot 项目为例，覆盖结构、命名、API、数据库、日志（输出位置/编写规则/级别/traceId）、Git、协作流程、线上排查。入职第一天不被导师皱眉的最低标准。
+> 以一个标准的互联网企业 SpringBoot 项目为例，覆盖结构、命名、API、数据库、日志、Git、协作流程、线上排查、网络攻击防范、基础项目功能清单。入职第一天不被导师皱眉的最低标准。
 
 ***
+
+**完整链路请求：**  SpringBoot 接收请求 → 参数校验 → 登录鉴权 (JWT) →会话管理 → 业务逻辑 → 调用数据库 → 返回结果，全局异常处理→ 返回前端渲染（逐环展开见第十四章）
 
 ## 一、项目结构规范
 
@@ -497,6 +499,8 @@ application-prod.yml        # 生产
 | 敏感数据   | 手机号/身份证出参脱敏（138\*\*\*\*5678）                                |
 | 接口文档   | 生产环境关闭 Knife4j（springdoc.api-docs.enabled=false）            |
 
+> 上表是速查；各攻击的原理、绕过手段与代码级防御详见**十三、网络攻击防范**。
+
 ***
 
 ## 十一、单元测试规范
@@ -609,7 +613,326 @@ jmap -dump:format=b,file=heap.hprof <pid>      # 抓堆快照
 
 ***
 
-## 十三、对照自查（新人前三个月高频打回项）
+## 十三、网络攻击防范
+
+> 安全总原则三条：**所有外部输入都不可信**（参数校验是第一道防线）、**纵深防御**（WAF/网关/应用/数据库层层设防，任何一层被绕过不致全线失守）、**最小权限**（数据库账号、服务器账号只给必要权限）。
+
+### 13.1 输入校验防护（第一道防线）
+
+#### SQL 注入
+
+原理一句话：用户输入被拼接进 SQL，改变了原语句语义（`' OR '1'='1`）。
+
+```java
+// 正确：#{} 预编译，值作参数传递，不可能改变语法结构
+WHERE username = #{username}
+
+// 危险：${} 字符串直接替换进 SQL
+ORDER BY ${orderBy}      // 用户传 "id; DROP TABLE user" 就完了
+```
+
+| 写法 | 本质 | 使用场景 |
+| ---- | ---- | ---- |
+| `#{}` | 预编译占位符（PreparedStatement） | 所有值，默认选择 |
+| `${}` | 字符串直接替换 | 表名/列名/排序字段——**必须白名单** |
+
+`${}` 唯一的正确用法（白名单校验）：
+
+```java
+private static final Set<String> ORDER_WHITELIST = Set.of("create_time", "id", "amount");
+
+String orderBy = ORDER_WHITELIST.contains(query.getOrderBy())
+        ? query.getOrderBy() : "id";   // 不在白名单一律回退默认值
+```
+
+配套两招：MyBatis-Plus QueryWrapper 天然参数化（`eq("username", name)`）；数据库账号最小权限（应用账号不给 DROP/FILE/GRANT，被注入也删不了表）。
+
+#### XSS 跨站脚本攻击
+
+三种形态：**存储型**（脚本入库，所有浏览者中招，最危险）、反射型（脚本藏在 URL 参数里）、DOM 型（前端 JS 拼接）。
+
+前后端分离 JSON API 主要防**存储型**——昵称/评论里塞 `<script>`：
+
+```java
+// 纯文本字段：入库前转义（hutool）
+String safe = HtmlUtil.escape(nickname);   // <script> → &lt;script&gt;
+
+// 富文本字段（确实要支持 HTML）：白名单过滤（Jsoup）
+String clean = Jsoup.clean(richText, Whitelist.relaxed());
+```
+
+三层防御：输入转义（核心）→ 输出上下文编码（Vue/React 默认转义；**禁用 v-html** 除非已过滤）→ CSP 响应头兜底（`Content-Security-Policy: default-src 'self'`）。
+
+#### 命令注入 / 路径遍历
+
+```java
+// 命令注入：输入拼接命令，host 传 "8.8.8.8; rm -rf /" 直接执行
+Runtime.getRuntime().exec("ping " + host);              // 危险
+// 防护：能不用系统命令就不用；必须用 → 参数化传参（不经 shell 解释）+ 值校验
+if (!host.matches("^[\\w.-]+$")) throw new IllegalArgumentException();
+new ProcessBuilder("ping", "-c", "1", host).start();
+```
+
+```java
+// 路径遍历：fileName 传 "../../etc/passwd" 读任意文件
+File file = new File(baseDir, fileName);                // 危险
+// 防护：规范化后必须仍在基目录内；文件名不信任用户输入（用 UUID 重命名 + DB 存映射）
+String canonical = file.getCanonicalPath();
+if (!canonical.startsWith(new File(baseDir).getCanonicalPath() + File.separator)) {
+    throw new BusinessException(ResultCode.ILLEGAL_ARGUMENT);
+}
+```
+
+延伸坑：**ZipSlip**——解压时压缩包内 entry 名含 `../`，同法校验解压目标路径。
+
+#### 请求参数校验（JSR-303）
+
+```java
+public class CreateUserDTO {
+    @NotBlank(message = "用户名不能为空")
+    @Size(min = 4, max = 20, message = "用户名长度 4-20")
+    private String username;
+
+    @Email(message = "邮箱格式不正确")
+    private String email;
+
+    @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
+    private String phone;
+}
+
+@PostMapping("/users")
+public Result<Void> create(@Validated @RequestBody CreateUserDTO dto) { ... }
+```
+
+纪律：**Controller 校验格式，Service 校验业务规则**（账号是否已存在）；分页参数强制上限（pageSize ≤ 100，防深分页拖库）。
+
+#### 文件上传攻击
+
+| 防线 | 实现 | 对抗的绕过手段 |
+| ---- | ---- | ---- |
+| 后缀白名单 | 只允许 jpg/png/pdf，**按最后一个 `.` 判断** | `a.jsp.png` 双扩展名 |
+| 文件头校验 | 读 magic number（JPEG=FFD8FF），不信 Content-Type | 改 Content-Type 的图片马 |
+| 重命名 | UUID 存储，原名进 DB 映射 | 路径穿越、特殊文件名 |
+| 存储隔离 | 存 Web 根目录外 / 专属 OSS，目录禁执行权限 | webshell 被执行 |
+| 大小限制 | `spring.servlet.multipart.max-file-size=10MB` | 大文件耗尽磁盘/内存 |
+
+### 13.2 会话与身份认证攻击
+
+#### 会话劫持
+
+攻击者拿到 sessionId 冒充用户（来源：XSS 偷 cookie、网络嗅探、会话固定攻击）。
+
+| 防护 | 实现 |
+| ---- | ---- |
+| Cookie 三属性 | `HttpOnly`（JS 读不到，防 XSS 偷）+ `Secure`（仅 HTTPS 传输）+ `SameSite=Lax` |
+| 防会话固定 | 登录成功后**重新生成 sessionId**，老 ID 作废 |
+| 会话超时 | 30 分钟无操作过期（敏感系统 5-10 分钟） |
+| 异常检测 | 异地登录提醒/踢下线；并发会话数限制 |
+
+```yaml
+server.servlet.session.cookie.http-only: true
+server.servlet.session.cookie.secure: true
+server.servlet.session.timeout: 30m
+```
+
+#### 暴力破解
+
+组合拳：**失败 N 次锁定/出验证码**（Redis 计数，5 次后强制滑块）→ **限流**（账号 + IP 双维度）→ **BCrypt 慢哈希**（拖慢离线破解）→ **错误信息模糊化**（统一"用户名或密码错误"，不暴露哪个错、不暴露账号是否存在）。
+
+#### CSRF 跨站请求伪造
+
+原理：浏览器对已登录站点自动携带 Cookie，恶意页面诱导用户浏览器发起转账等请求。
+
+- **前后端分离 + JWT（header 传 token）天然免疫**：token 在 JS 变量里，第三方页面无法让浏览器自动携带——"为什么用 token 不用 cookie"的标准答案
+- 传统 session 方案：CSRF token（页面埋 token，请求头带回，服务端比对）+ `SameSite` Cookie
+- 关键操作（支付/改密）二次验证：密码或验证码确认
+- Spring Security 的 CSRF 默认开启；前后端分离项目常显式关闭改用 JWT——要知道关掉后靠什么补位
+
+#### JWT / Token 安全
+
+| 规则 | 说明 |
+| ---- | ---- |
+| 算法白名单 | 服务端校验时固定算法（HS256/RS256），**禁信任 header 里的 alg**——防 `alg:none` 攻击 |
+| 必设过期 | 双 token：access 2h + refresh 7d；服务端必须校验 exp |
+| payload 最小化 | 只放 userId/角色；Base64 只是编码不是加密，**能直接解出来** |
+| Secret 管理 | 环境变量/Nacos；HS256 密钥 ≥ 256bit；泄露 = 全线失守 |
+| 注销难题 | 无状态 JWT 无法主动失效 → Redis 黑名单 / 双 token 短时效 / 用户版本号 |
+| 存储位置 | localStorage（XSS 可偷）vs HttpOnly Cookie（要防 CSRF）——讲得清 trade-off 即可 |
+
+双 token 流程：access 过期 → refresh 换新 access → refresh 也过期才重新登录。refresh 服务端可控撤销，弥补了"JWT 没法主动踢人"的缺陷。
+
+#### 越权攻击（渗透测试第一高频漏洞）
+
+| 类型 | 场景 | 防护 |
+| ---- | ---- | ---- |
+| 水平越权 | 用户 A 把 URL `orders/1001` 改成 `1002`，看到别人的订单 | **资源归属校验**：service 层查询条件带 userId，不只查 orderId |
+| 垂直越权 | 普通用户直接调 `/api/admin/delete` | 接口权限注解（`@PreAuthorize` / 自定义 `@RequiresRole`）+ 网关路由隔离管理端 |
+
+```java
+// 水平越权防护：查/改资源必须验证归属
+Order order = orderMapper.selectById(orderId);
+if (!order.getUserId().equals(currentUserId)) {
+    throw new BusinessException(ResultCode.FORBIDDEN);   // 不是你的单子
+}
+```
+
+### 13.3 网络传输与网络层防护
+
+#### TLS / HTTPS
+
+- 全站 HTTPS：登录/支付强制；HTTP 301 跳转；HSTS 头（`Strict-Transport-Security: max-age=31536000`）防降级攻击
+- 证书：Let's Encrypt 免费 + certbot 自动续期
+
+```nginx
+server {
+    listen 443 ssl;
+    ssl_certificate     /etc/nginx/cert/fullchain.pem;
+    ssl_certificate_key /etc/nginx/cert/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;    # 禁 SSLv3 / TLS1.0 / 1.1
+}
+server {
+    listen 80;
+    return 301 https://$host$request_uri;
+}
+```
+
+#### IP 黑白名单
+
+按流量经过顺序三层实现：
+
+```nginx
+# Nginx 层：管理后台只允许办公网
+location /admin/ {
+    allow 10.0.0.0/8;
+    deny all;
+}
+```
+
+```java
+// 微服务：Gateway GlobalFilter 统一拦截
+// 单体：HandlerInterceptor（preHandle 里校验 IP）
+```
+
+坑：多层代理后 `request.getRemoteAddr()` 拿到的是 Nginx IP；真实 IP 在 `X-Forwarded-For`，但**该头可伪造**——只信任自己配置的代理链的最后一跳，不能无脑取第一个。
+
+#### CORS 跨域安全
+
+```java
+// 错误：Origin 反射（把请求 Origin 原样返回）+ allowCredentials = 任意网站带 cookie 调你的接口
+// 正确：白名单
+@Configuration
+public class CorsConfig implements WebMvcConfigurer {
+    private static final List<String> ALLOWED_ORIGINS =
+            List.of("https://www.example.com", "https://admin.example.com");
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/api/**")
+                .allowedOrigins(ALLOWED_ORIGINS.toArray(new String[0]))  // 白名单，禁 *
+                .allowedMethods("GET", "POST", "PUT", "DELETE")
+                .allowCredentials(true)
+                .maxAge(3600);   // 预检结果缓存，减少 OPTIONS 请求
+    }
+}
+```
+
+理解：CORS 是**浏览器**的安全机制；服务端配置过宽等于主动放弃保护。`allowedOrigins("*")` + `allowCredentials(true)` 的组合新版 Spring 会直接抛异常。
+
+#### WAF 防护（网关层）
+
+| 层 | 工具 | 防什么 |
+| ---- | ---- | ---- |
+| 云 WAF | 阿里云/腾讯云 WAF | SQL 注入、XSS、扫描器、CC（托管，省心） |
+| 开源自建 | ModSecurity + OWASP CRS / 雷池 SafeLine | 同上，自己运维 |
+| 网关规则 | Nginx + Lua / Sentinel | CC 攻击、IP 封禁、接口限流 |
+
+定位认知（面试标准答法）："代码层保证注入不可能发生（参数化查询），WAF 拦掉 99% 的扫描流量、降低到达应用的噪音——**纵深防御的一环，不能替代代码级防护**（变形 payload 绕 WAF 手段很多）。"
+
+### 13.4 攻击面自检表
+
+| 攻击 | 一句话验证 |
+| ---- | ---- |
+| SQL 注入 | 全局搜 `${`，逐一确认有白名单 |
+| XSS | 昵称存 `<img onerror=alert(1)>`，看列表页是否执行 |
+| 越权 | 登录 A 账号，URL 里资源 id 换成 B 的，看能否读到 |
+| CSRF | 接口是否仅凭 cookie 鉴权且无 token |
+| 文件上传 | 改后缀的文件马上传，看能否存下来/被解析执行 |
+| 暴力破解 | 连续输错 5 次密码，观察是否有验证码/锁定 |
+| CORS | 看响应头 Access-Control-Allow-Origin 是不是 `*` 或反射 |
+
+***
+
+## 十四、基础项目功能清单（功能实现）
+
+> 回答"一个基础项目要实现哪些功能"。优先级标注：**P0** 没有 = 项目不完整；**P1** 应该有，面试加分；**P2** 锦上添花。一个能写上简历的项目 = 全部 P0 + 大部分 P1。
+
+### 14.1 主业务链路（P0）
+
+```
+请求 → Filter（traceId 生成）
+     → 拦截器（JWT 鉴权 / 登录校验）
+     → AOP（出入参日志 + 耗时）
+     → Controller（@Validated 参数校验）
+     → Service（业务逻辑 + 事务边界 + 资源归属校验）
+     → Mapper（参数化 SQL）
+     → 统一返回 Result<T>
+     → 全局异常处理器兜底 → 前端渲染
+```
+
+链路每一环都对应本规范的章节（拦截器见六、异常见七、鉴权与越权见十三）。**这条链就是面试"讲讲你的项目"的故事主线**：请求从进来到返回，每一站做了什么、为什么这么做。
+
+### 14.2 安全模块
+
+| 功能 | 实现方案 | 优先级 |
+| ---- | ---- | ---- | ---- |
+| 密码加密 | BCrypt（自带盐、慢哈希）；注册 `encode`，登录 `matches`。禁 MD5（快、彩虹表） | P0 |
+| 接口防重 / 幂等 | 四方案见下表，至少落地"唯一索引 + token 机制" | P0 |
+| 接口限流 | Guava RateLimiter（单机）→ Redis + Lua（分布式）→ Sentinel（生产）；注解 + AOP 封装 `@RateLimit` | P0 |
+| 数据脱敏 | Jackson 自定义序列化器（`@JsonSerialize`）对手机号/身份证/邮箱出参脱敏 | P0 |
+| 验证码 | 行为验证码（滑块）/ hutool 图形码；登录失败 3-5 次后强制 | P1 |
+| 会话管控 | 单设备在线 / 踢下线（Redis 存 userId → token 映射）、会话超时、异地提醒 | P1 |
+| 文件上传管控 | 13.1 文件上传五防线 | P1 |
+| 数据导出管控 | 导出鉴权 + 导出行为审计日志 + 大数据量异步导出（线程池 + 完成通知） | P2 |
+
+幂等四方案（面试高频）：
+
+| 方案 | 原理 | 适用 |
+| ---- | ---- | ---- |
+| 唯一索引 | 业务单号建 uk，重复插入报错兜底 | 最后防线，必配 |
+| token 机制 | 进页面发一次性 token，提交带上，Redis 校验后删除 | 防表单重复提交 |
+| 状态机 | 只允许合法状态流转（已支付不能再支付） | 有状态的业务对象 |
+| 分布式锁 | Redis SETNX 抢锁，串行化重复请求 | 并发写同一资源 |
+
+### 14.3 基础框架能力
+
+| 功能 | 要点 | 优先级 |
+| ---- | ---- | ---- | ---- |
+| 全局异常 + 统一返回 + 错误码 | 见第七章；错误码枚举按模块分段 | P0 |
+| 全局请求/响应拦截 | traceId、鉴权、访问日志三件套（见第六章） | P0 |
+| 通用分页组件 | PageQuery 入参 + PageVO 出参 + MP 分页插件 | P0 |
+| API 文档管控 | Knife4j：dev 开 / prod 关（`springdoc.api-docs.enabled=false`）、文档访问密码、接口分组 | P0 |
+| 测试基座 | 造数工具类、单测 `@Transactional` 自动回滚、冒烟用例基线（登录 → 下单 → 查询主链路） | P1 |
+| 通用文件服务 | 上传/下载/预览统一封装，本地存储与 OSS 可切换 | P2 |
+
+### 14.4 运维监控
+
+| 功能 | 实现方案 | 优先级 |
+| ---- | ---- | ---- | ---- |
+| 日志五件套 | 业务日志（AOP 出入口）、框架日志（logging.level）、GC 日志、慢 SQL 日志、崩溃日志兜底（hs_err）——详见第六章与《日志全景》 | P0 |
+| TraceId 全链路 | Filter + MDC + Feign 透传，日志和返回体都带 | P0 |
+| 服务指标监控 | Actuator（health/metrics）→ Prometheus 抓取 → Grafana 看板：JVM、CPU、线程池、连接池四大看板 | P1 |
+| 接口监控 | Micrometer 打点：QPS、耗时 P95/P99、错误率 | P1 |
+| 异常告警 | Grafana 告警规则 → 钉钉/邮件 webhook；EFK 侧 ERROR 日志突增告警 | P1 |
+
+### 14.5 清单的用法：变成面试弹药
+
+每个功能按"三段式"准备：**为什么需要（场景）→ 怎么实现（方案对比）→ 踩过什么坑（细节）**。
+
+例：限流不能只说"用了 Guava"，而是——"压测发现下单接口被打挂 → 单机 RateLimiter 先挡住 → 部署两台后限流不齐 → 换 Redis + Lua 分布式限流，Lua 脚本保证判量+扣减原子性"。一个功能讲成一条演进故事，胜过罗列十个功能名。
+
+***
+
+## 十五、对照自查（新人前三个月高频打回项）
 
 - [ ] Controller 里有业务逻辑 → 挪到 Service
 
@@ -638,3 +961,11 @@ jmap -dump:format=b,file=heap.hprof <pid>      # 抓堆快照
 - [ ] 没自测就提测
 
 - [ ] 线上出问题直接重启（没先留 dump / jstack 现场）
+
+- [ ] 代码里有 `${}` 拼接且没做白名单
+
+- [ ] 查询/修改资源没校验归属（水平越权漏洞）
+
+- [ ] 上传文件只校验了后缀，没查文件头
+
+- [ ] CORS 配了 `*` 还开了 allowCredentials

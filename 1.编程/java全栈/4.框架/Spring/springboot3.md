@@ -697,6 +697,118 @@ spring‑boot‑starter‑data‑jdbc
 
 `@SpringBootTest`：默认加载同目录下 `application.yml` 配置，自动启动 Spring 上下文。
 
+## 配置文件
+
+> 优先级：同目录下 properties > yml；外部配置 > jar 内配置
+
+### 配置文件类型
+
+> properties 用`key=value`扁平书写；yml 靠空格缩进做树形分层，可读性更好，但缩进写错就报错
+
+1. `application.yml` / `application.yaml`（常用，缩进敏感）
+2. `application.properties`（k=v 格式）
+3. 多环境：`application-dev.yml`、`application-prod.yml`
+
+### 加载优先级
+
+1. 命令行参数
+2. 环境变量传入的外部配置文件
+3. `additional‑location`指定的外部 yml（**后面文件覆盖前面**）
+4. jar 内 application.yml
+
+### 加载外部配置文件
+
+#### 方式 1：jar 内 yml 硬编码路径（仅本地测试，不建议生产）
+
+```
+resources/application.yml
+spring:
+  config:
+    # 逗号分隔多个外部文件
+     import: optional:file:D:/yml/wxpay-config.yml
+     # 这个是2.x的命令
+     additional-location: file:D:/config/wxpay-config.yml,file:D:/config/db-config.yml
+```
+
+文件放在磁盘：`D:\config\` 直接启动，**不需要任何启动参数**
+
+```
+java -jar app.jar
+```
+
+⚠️缺点：路径写死在 jar，换电脑部署需要重新打包。
+
+#### 方式 2：占位符 + 环境变量（✅生产推荐，jar 不写死路径）
+
+**1）jar 内 application.yml**
+
+```
+spring:
+  config:
+    # 从环境变量读取外部配置路径，为空则不加载额外文件
+    additional-location: ${SPRING_EXTERNAL_CONFIG:}
+
+# 所有密钥配置使用占位符，不写真实值
+wxpay:
+  app-id: ${wxpay.app-id:}
+  mch-id: ${wxpay.mch-id:}
+  api-v3-key: ${wxpay.api-v3-key:}
+  cert-serial-no: ${wxpay.cert-serial-no:}
+  private-key-path: ${wxpay.private-key-path:}
+```
+
+**2）设置环境变量后启动**
+
+PowerShell
+
+```
+# 多个文件逗号隔开
+$env:SPRING_EXTERNAL_CONFIG="file:D:/config/wxpay-config.yml,file:D:/config/db-config.yml"
+java -jar app.jar
+```
+
+CMD
+
+```
+set SPRING_EXTERNAL_CONFIG=file:D:/config/wxpay-config.yml,file:D:/config/db-config.yml
+java -jar app.jar
+```
+
+3）外部配置文件示例 `D:\config\wxpay-config.yml`
+
+```
+wxpay:
+  app-id: wxxxxx
+  mch-id: xxxx
+  api-v3-key: xxxx
+  cert-serial-no: xxxx
+  private-key-path: D:/cert/apiclient_key.pem
+```
+
+> 微信证书写**磁盘绝对路径**，不要打进 jar 包。
+
+方式 3：命令行传参（临时使用）
+
+```
+java -jar app.jar --spring.config.additional-location="file:D:/config/wxpay-config.yml,file:D:/config/db-config.yml"
+```
+
+方式 4：SpringBoot 自动加载（只能 jar 同级 config 目录）
+
+> 局限性：**只能放在 jar 同目录下的`config`文件夹，不能自定义其他目录**
+
+```
+app.jar
+config/
+    application.yml
+```
+
+直接启动：`java -jar app.jar`
+
+> 如果你要放到 D 盘其他文件夹，此方案不可用。
+
+
+
 ## application.yml 完整语法
 
 > SpringBoot 会同时加载`application.yml` + `application.properties`；properties 优先级高于 yml
@@ -863,7 +975,7 @@ data class ChatConfig(
 5. 空值：写 `password:` 后面留空，不要写 `password: null`
 6. yml 中`off / on、yes / no`会自动转布尔，字符串 "yes" 要加引号 `"yes"`
 
-## SpringBoot Profile 多环境切换（开发 dev / 生产 prod）
+##  Profile 多环境切换
 
 > **Profile 作用：一套代码，不同环境加载不同配置** 开发环境：本地调试、开启 h2 控制台、关闭 thymeleaf 缓存、日志打全； 生产环境：连接真实数据库、关闭调试功能、关闭控制台、日志精简。
 
@@ -987,139 +1099,6 @@ java -jar chat-demo.jar --spring.profiles.active=prod
 
 > 线上服务器运维最喜欢这种，直接启动命令指定，不用修改任何配置文件。
 
-## 配置文件优先级
-
-
-
-
-
-
-
-
-
-
-
-
-
-### 加载外部配置文件
-
-，把敏感信息移除yml
-
-#### 方式 1：jar 内 yml 硬编码路径（仅本地测试，不建议生产）
-
-```
-resources/application.yml
-spring:
-  config:
-    # 逗号分隔多个外部文件
-     import: optional:file:D:/yml/wxpay-config.yml
-     # 这个是2.x的命令
-     additional-location: file:D:/config/wxpay-config.yml,file:D:/config/db-config.yml
-```
-
-文件放在磁盘：`D:\config\` 直接启动，**不需要任何启动参数**
-
-```
-java -jar app.jar
-```
-
-⚠️缺点：路径写死在 jar，换电脑部署需要重新打包。
-
-#### 方式 2：占位符 + 环境变量（✅生产推荐，jar 不写死路径）
-
-### 1）jar 内 application.yml
-
-```
-spring:
-  config:
-    # 从环境变量读取外部配置路径，为空则不加载额外文件
-    additional-location: ${SPRING_EXTERNAL_CONFIG:}
-
-# 所有密钥配置使用占位符，不写真实值
-wxpay:
-  app-id: ${wxpay.app-id:}
-  mch-id: ${wxpay.mch-id:}
-  api-v3-key: ${wxpay.api-v3-key:}
-  cert-serial-no: ${wxpay.cert-serial-no:}
-  private-key-path: ${wxpay.private-key-path:}
-```
-
-### 2）设置环境变量后启动
-
-#### PowerShell
-
-```
-# 多个文件逗号隔开
-$env:SPRING_EXTERNAL_CONFIG="file:D:/config/wxpay-config.yml,file:D:/config/db-config.yml"
-java -jar app.jar
-```
-
-#### CMD
-
-```
-set SPRING_EXTERNAL_CONFIG=file:D:/config/wxpay-config.yml,file:D:/config/db-config.yml
-java -jar app.jar
-```
-
-### 3）外部配置文件示例 `D:\config\wxpay-config.yml`
-
-```
-wxpay:
-  app-id: wxxxxx
-  mch-id: xxxx
-  api-v3-key: xxxx
-  cert-serial-no: xxxx
-  private-key-path: D:/cert/apiclient_key.pem
-```
-
-> 微信证书写**磁盘绝对路径**，不要打进 jar 包。
-
-#### 方式 3：命令行传参（临时使用）
-
-```
-java -jar app.jar --spring.config.additional-location="file:D:/config/wxpay-config.yml,file:D:/config/db-config.yml"
-```
-
-#### 方式 4：SpringBoot 自动加载（只能 jar 同级 config 目录）
-
-> 局限性：**只能放在 jar 同目录下的`config`文件夹，不能自定义其他目录**
-
-```
-app.jar
-config/
-    application.yml
-```
-
-直接启动：`java -jar app.jar`
-
-> 如果你要放到 D 盘其他文件夹，此方案不可用。
-
-------
-
-### 关键概念对比
-
-表格
-
-| 配置项                              | 作用                                                         |
-| ----------------------------------- | ------------------------------------------------------------ |
-| `spring.config.additional‑location` | **追加**，保留 jar 内部 application.yml，可加载多个外部文件，可写在 yml 内 |
-| `spring.config.location`            | **替换**，不加载 jar 内 application.yml，**不能写在 yml 内部，只能命令行传入** |
-
-### 加载优先级（高→低）
-
-1. 命令行参数
-2. 环境变量传入的外部配置文件
-3. `additional‑location`指定的外部 yml（**后面文件覆盖前面**）
-4. jar 内 application.yml
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1142,7 +1121,7 @@ config/
 | Servlet 版本       | 最低 3.1（Tomcat 8.5），默认 4.0（Tomcat 9.0）               | 最低 5.0（Tomcat 10.0），默认 6.0（Tomcat 10.1）             | Servlet 版本与 Tomcat 版本强绑定，3.x 全面适配 Jakarta Servlet 规范，与 2.x 的 javax.servlet 包不兼容 |
 | IntelliJ IDEA 版本 | 最低 2018.3，推荐 2020.3 及以上2.7.x 建议 2021.1+ 获得完整支持 | 最低 2022.1，推荐 2023.2 及以上                              | 3.x 必须使用 2022.1 及以上版本，低版本 IDEA 不支持 Jakarta EE 9+ 规范，会出现代码识别、自动配置失效问题 |
 
-## 配置绑定
+## 配置读取
 
 > 配置绑定（Configuration Binding）：把外部配置源的数据，自动映射赋值到程序里 Java/Kotlin 对象的属性上。外部配置源可以是： `application.yml / application.properties`、系统环境变量、JVM 启动参数、命令行参数、Nacos/Apollo 远程配置中心。
 
@@ -1177,7 +1156,7 @@ private var enable:Boolean = false
 ```
 
 - 支持 `${key}` 占位符，支持默认值 `${app.chat.timeout:3000}`
-- **只能绑定简单类型：基本类型、String**
+- 只能读取**单个属性**，注入简单类型（字符串、数字、布尔）
 - ❌**不支持复杂对象、List、嵌套对象**；不支持 JSR‑303 校验
 - 运行时解析，不支持配置元数据提示（IDEA 提示弱）
 - 不支持松散绑定（`app.chat.time‑out` / `app.chat.timeOut`）
@@ -1195,7 +1174,7 @@ data class ChatConfig(
 )
 ```
 
-需要开启：`@EnableConfigurationProperties(ChatConfig::class)` 或者添加依赖处理器（IDE 提示）
+> ⚠️需要在启动类加 `@EnableConfigurationProperties` 或者依赖 spring-boot-configuration-processor（IDE 提示）
 
 ```
 annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
@@ -1249,28 +1228,12 @@ val chatConfig:ChatConfig? = binder.bind("app.chat", ChatConfig::class.java).orE
 
 ### 核心对比总表
 
-| 特性                | @Value           | @ConfigurationProperties             | Environment                     | Binder                           |
-| ------------------- | ---------------- | ------------------------------------ | ------------------------------- | -------------------------------- |
-| 批量对象绑定        | ❌                | ✅                                    | ❌                               | ✅                                |
-| 嵌套对象 / List/Map | ❌                | ✅                                    | ❌                               | ✅                                |
-| 松散绑定            | ❌                | ✅                                    | ❌                               | ✅                                |
-| JSR‑303 校验        | ❌                | ✅                                    | ❌                               | ✅                                |
-| IDE 配置提示        | 弱               | ✅                                    | ❌                               | ❌                                |
-| 注册 Spring Bean    | 是（字段注入）   | 需要`@EnableConfigurationProperties` | 不是 Bean，是接口               | **不注册 Bean**                  |
-| 使用场景            | 少量零散配置     | 一大组相关配置，写配置类             | 动态读取，运行时才知道 key      | 动态绑定对象，不放入 Spring 容器 |
-| 默认值支持          | `${key:default}` | 属性赋初始值                         | `getProperty(key,type,default)` | `.orElse(默认对象)`              |
-
-### 松散绑定说明
-
-yml、环境变量、系统参数多种写法自动识别同一个属性：
-
-```
-app.chat.time-out: 1000   # kebab短横线
-app.chat.timeOut: 1000    # 驼峰
-APP_CHAT_TIMEOUT=1000    # 系统环境变量大写下划线
-```
-
-`@Value` **不支持**，key 必须完全一模一样。
+| 方式                     | 核心特点                                        | 能否绑定对象 / 嵌套  | 默认支持校验      | 适合场景                 |
+| ------------------------ | ----------------------------------------------- | -------------------- | ----------------- | ------------------------ |
+| @Value                   | 单个字段注入，支持 SpEL                         | ❌仅简单值            | ❌                 | 零散少量配置             |
+| @ConfigurationProperties | 前缀批量绑定                                    | ✅支持对象、List、Map | ✅支持 JSR303 校验 | 一组相关配置（推荐首选） |
+| Environment              | API 动态读取 getProperty                        | ❌只能读简单值        | ❌                 | 运行时动态获取配置       |
+| Binder                   | 底层绑定 API，@ConfigurationProperties 底层实现 | ✅强支持复杂结构      | ✅                 | 高级动态绑定场景         |
 
 ### 实际开发怎么选
 
@@ -1286,13 +1249,13 @@ APP_CHAT_TIMEOUT=1000    # 系统环境变量大写下划线
 
 > ❌不要混用：不要同一个配置，一部分 @Value，一部分 @ConfigurationProperties，维护混乱。
 
-## 配置文件读取
-
 > 读取 SpringBoot 自动加载的 `application.yml / application‑xxx.yml`（系统配置文件）
 
 上述四种
 
 > 读取自定义 YAML 文件，例如 `myconfig.yml`，不是 Spring 自动加载的配置
+
+### 其他方法
 
 **方式 5：`@PropertySource` + YamlPropertySourceFactory**
 
@@ -1339,6 +1302,10 @@ fun loadMyYaml(): YamlPropertiesFactoryBean {
     return bean
 }
 ```
+
+##  @Configuration
+
+自定义配置类 @Configuration
 
 ## 日志
 
@@ -1689,6 +1656,52 @@ target/xxx.war
 ```
 
 # WEB开发
+
+## DO/DTO/VO/BO/POJO
+
+核心原则：**分层隔离，不同层用不同对象，不要一个实体走完全程**
+
+
+
+| 缩写     | 中文名称       | 存放位置          | 核心作用                                                     | 你的 OJ 例子                                                 |
+| -------- | -------------- | ----------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| **POJO** | 简单 Java 对象 | 通用概念          | 单纯 Java 类，只有字段 + get/set，**没有继承、没有业务逻辑**；DO/DTO/VO/BO 全部都属于 POJO | LoginDTO、Denglu (DO)、ExamRankingVO 都是 POJO               |
+| **DO**   | 数据对象       | `com.exam.entity` | **和数据库表一一对应**，MyBatis/MyBatisPlus 操作数据库，字段和数据库列一致 | `Denglu`、`ExamRecord`、`Paper`                              |
+| **DTO**  | 数据传输对象   | `com.exam.dto`    | **层之间传递数据**✅ RequestDTO：Controller 接收前端请求入参✅ 也可用于 Service 之间传参 | `LoginDTO`（接收邮箱、验证码）                               |
+| **VO**   | 视图对象       | `com.exam.vo`     | **返回给前端页面展示**，按需组装字段，过滤敏感信息           | `ExamRankingVO`、`AuthLoginVO`（登录返回给前端）             |
+| **BO**   | 业务对象       | `com.exam.bo`     | **Service 层内部使用**，封装复杂业务组合数据，由多个 DO 组装而成，不对外暴露 | 比如考试统计 BO，组合 ExamRecord、Paper 多个 DO 的数据，仅在 Service 内部流转 |
+
+**完整数据流**
+
+```
+前端JSON → LoginDTO（入参DTO） → Controller
+        ↓
+Service拿到DTO，查询数据库得到DO(Denglu)
+        ↓
+Service内部组装业务数据，可封装BO（复杂业务才需要）
+        ↓
+DO → 转为 AuthLoginVO（VO） → Controller
+        ↓
+返回VO给前端
+
+```
+
+**重点**
+
+1. **DO 严禁直接返回前端** DO 里面有 password、secret 等敏感字段，直接返回会泄露。要转成 VO 再返回。
+
+> 你代码里：`user.setPassword(null);` 就是临时补救，规范做法是转 VO。
+
+2. **DTO 和 VO 区别**
+
+- DTO：**接收前端传进来的数据（入参）**
+- VO：**后端输出、给前端展示（出参）**
+
+> 小项目为省事，有人合并，但是大型项目分开。
+
+3. **BO 什么时候才用？** 简单业务（邮箱登录）**不需要 BO**。 只有业务需要**把多张表的 DO 合并成一个业务对象**，才用 BO。 例如：统计一场考试，同时拿考生记录、试卷信息、题目信息，在 Service 内部组装成 ExamStatBO。
+
+4. **POJO 是统称！** 不是和 DO/DTO 并列。DO、DTO、VO、BO**全部属于 POJO**。只要普通 JavaBean，不是框架类、不是接口，就是 POJO。
 
 pringBoot 的Web开发能⼒，由SpringMVC提供。
 
@@ -2345,7 +2358,7 @@ SpringBoot Web 开发场景 **3 种配置方式**：
 
 函数式 Web 是 Spring 5.2+ 推出的无注解 Web 编程模型，用 RouterFunction 定义路由、HandlerFunction 处理请求，路由与业务分离，适配 WebFlux 响应式，代码更简洁、灵活、可测试。
 
-# 原理
+# 高级开发
 
 ## 自动配置
 
@@ -2499,7 +2512,95 @@ spring-boot-starter  导⼊了⼀个包  都是各种场景的 spring-boot-autoc
 
 ## 注解
 
-SpringBoot 摒弃XML配置⽅式，改为全注解驱动
+> SpringBoot 摒弃XML配置⽅式，改为全注解驱动
+
+### **必须掌握注解**
+
+| 注解                       | 作用                                           | 一句话                                     |
+| -------------------------- | ---------------------------------------------- | ------------------------------------------ |
+| `@SpringBootApplication`   | 启动类复合注解，自动扫描、自动配置             | 项目入口，只能写在主启动类                 |
+| `@Configuration`           | 标记配置类，里面可以写 @Bean                   | 用来注册第三方组件（MinIO、RedisTemplate） |
+| `@Bean`                    | 在配置类中，把方法返回对象交给 Spring 容器管理 | 注册外部客户端、模板对象                   |
+| `@Component`               | 通用组件，交给 Spring 管理                     | 工具类 RedisUtils、过滤器这类              |
+| `@Service`                 | 业务层，继承 @Component                        | Service 实现类，写业务逻辑                 |
+| `@RestController`          | 接口控制器 = @Controller + @ResponseBody       | 接收前端请求，返回 JSON                    |
+| `@Autowired`               | 自动注入对象（依赖注入）                       | 注入 Mapper、Service、工具类               |
+| `@Value`                   | 读取 yml 配置文件单个值                        | 读取密钥、接口地址                         |
+| `@ConfigurationProperties` | 批量绑定 yml 前缀配置（推荐替代大量 @Value）   | MinIO 配置，批量读取一组配置               |
+
+**Web MVC 接口相关（写接口天天用）**
+
+| 注解                                                        | 作用                                   | 一句话                   |
+| ----------------------------------------------------------- | -------------------------------------- | ------------------------ |
+| `@RequestMapping`                                           | 通用请求路径映射，类上写接口前缀       | `/api/auth`、`/api/exam` |
+| `@PostMapping / @GetMapping / @PutMapping / @DeleteMapping` | 限定请求方法                           | REST 风格接口            |
+| `@RequestBody`                                              | 读取前端**JSON 请求体**，转为 DTO 对象 | 登录、提交答案接口用     |
+| `@RequestParam`                                             | 读取 URL 问号后的参数 `?name=xxx`      | 普通表单参数             |
+| `@PathVariable`                                             | 读取路径上变量 `/exam/{id}`            | 获取路径中的 ID          |
+| `@CrossOrigin`                                              | 跨域（优先全局 CorsConfig）            | 解决前端浏览器跨域报错   |
+
+**全局异常 & 接口文档（项目亮点，面试必说）**
+
+| 注解                    | 作用                                         | 一句话                          |
+| ----------------------- | -------------------------------------------- | ------------------------------- |
+| `@RestControllerAdvice` | 全局统一异常处理器，捕获所有 controller 异常 | 统一返回 JSON 错误信息          |
+| `@ExceptionHandler`     | 捕获指定类型异常                             | BusinessException、参数校验异常 |
+| `@Tag`                  | Knife4j 接口文档，分组                       | Controller 接口分组名称         |
+| `@Operation`            | Knife4j，接口描述                            | 描述接口作用                    |
+
+| 注解          | 作用                               | 一句话                  |
+| ------------- | ---------------------------------- | ----------------------- |
+| `@MapperScan` | 扫描所有 Mapper 接口，放到启动类   | 一次性扫描全部 mapper   |
+| `@Mapper`     | 标记 Mapper 接口，MyBatis 识别     | 每个 Mapper 接口上加    |
+| `@TableName`  | 实体类绑定数据库表名               | DO 实体，映射哪张表     |
+| `@TableId`    | 标记主键字段                       | 主键 id                 |
+| `@TableField` | 字段映射、字段策略                 | 非主键列                |
+| `@TableLogic` | 逻辑删除（不是真删，标记删除状态） | 软删除                  |
+| `@Version`    | 乐观锁，防止并发更新覆盖           | 并发修改试卷 / 考试记录 |
+
+**事务缓存**
+
+| 注解             | 作用                                 | 一句话                          |
+| ---------------- | ------------------------------------ | ------------------------------- |
+| `@Transactional` | 开启数据库事务，原子性               | **只写在 Service 层，失败回滚** |
+| `@EnableCaching` | 开启 Spring 缓存注解能力，写在配置类 | 开启 Redis 缓存功能             |
+| `@Cacheable`     | 查询缓存：先读缓存，没有再查库       | 查询题目，缓存结果              |
+| `@CacheEvict`    | 删除缓存，更新 / 新增数据时清除缓存  | 修改题目，清空旧缓存            |
+
+**参数校验**
+
+| 注解          | 作用                                        | 一句话            |
+| ------------- | ------------------------------------------- | ----------------- |
+| `@Valid`      | 开启 DTO 参数校验，写在 Controller 参数前面 | 触发 DTO 字段校验 |
+| `@NotBlank`   | 字符串不能空、不能空白（用于 String）       | 邮箱、验证码      |
+| `@NotNull`    | 不能为 null（数字、对象）                   | ID、试卷编号      |
+| `@Min / @Max` | 数字最小值最大值                            | 分数、页码范围    |
+| `@Email`      | 邮箱格式校验                                | 邮箱登录 DTO      |
+
+| 注解     | 作用                                | 一句话                                                       |
+| -------- | ----------------------------------- | ------------------------------------------------------------ |
+| `@Data`  | 自动生成 get、set、toString、equals | DTO、VO、DO 实体                                             |
+| `@Slf4j` | 自动生成 log 日志对象               | 打印日志[log.info](https://link.wtturl.cn/?target=https%3A%2F%2Flog.info&scene=im&aid=497858&lang=zh)() |
+
+**Jackson JSON 序列化（前后端时间 / 字段适配）**
+
+表格
+
+| 注解                    | 作用                               | 一句话                 |
+| ----------------------- | ---------------------------------- | ---------------------- |
+| `@JsonFormat`           | 时间格式化 + 时区，解决 8 小时时差 | LocalDateTime 时间字段 |
+| `@JsonIgnoreProperties` | 忽略多余属性，防止序列化报错       | MyBatisPlus 实体       |
+| `@JsonProperty`         | JSON 字段名称映射（蛇形转驼峰）    | 对接第三方 API（Kimi） |
+
+**Sa-Token 鉴权（后续替换 JWT 过滤器，重点）**
+
+表格
+
+| 注解                    | 作用                        | 一句话       |
+| ----------------------- | --------------------------- | ------------ |
+| `@SaCheckLogin`         | 接口必须登录才能访问        | 校验登录状态 |
+| `@SaCheckRole("admin")` | 必须拥有指定角色            | 管理员接口   |
+| `@SaCheckPermission`    | 细粒度权限，按钮 / 接口权限 | 资源权限控制 |
 
 ### **组件注解**
 
@@ -2575,6 +2676,10 @@ SpringBoot框架的框架、底层基于Spring。能调整每⼀个场景的底�
 3. 分析组件：  分析到  RedisAutoConfiguration   给容器中放了  给业务代码中⾃动装配  StringRedisTemplate 
 4.  定制化  修改配置⽂件 StringRedisTemplate  ⾃定义组件，⾃⼰给容器中放⼀个  StringRedisTemplate 
 
+## 原理
+
+SpringBoot事务管理
+
 # 场景整合
 
 ## 接口层开发
@@ -2629,6 +2734,49 @@ SpringBoot框架的框架、底层基于Spring。能调整每⼀个场景的底�
 3. **调大连接池/线程池只是止血不是治疗**——`HikariPool connection is not available` 必须用 `leak-detection-threshold` 或 `show processlist` 找到占连接的元凶。
 
 # 项目规范
+
+# 多模块项目
+
+> 常规多模块：父工程 + 多个子 module；**打包最终产出单个可执行 jar 包**（所有子模块代码、依赖打进这一个 jar）。 和「每个子模块单独打包成 jar」区分开
+
+## 一、项目结构
+
+```
+demo-parent              【父工程，pom类型，不写业务代码】
+├─ pom.xml
+├─ demo-common           【公共模块：工具、entity、mapper、常量、MDC工具、日志配置】
+│  └─ pom.xml
+├─ demo-service          【业务模块：service】
+│  └─ pom.xml
+├─ demo-controller       【接口模块：controller、AOP】
+│  └─ pom.xml
+└─ demo-bootstrap        【启动模块：SpringBoot入口类，打包入口！】
+   └─ pom.xml
+```
+
+- `demo-parent`：`packaging = pom`，统一管理版本、dependencyManagement
+- `demo-bootstrap`：**唯一带 SpringBoot 启动类的模块，打包目标模块**，依赖 common、service、controller
+- 打包：只打包 `demo-bootstrap`，它会把依赖的所有子模块代码一起打进最终 jar 包。
+
+> ✅ 最终产物：`demo-bootstrap-xxx.jar`，单个 jar，java -jar 直接运行。
+
+## 二、父工程 pom.xml（demo-parent）
+
+核心：`packaging pom`，`dependencyManagement` 锁定版本，不实际引入依赖。
+
+## 三、子模块：
+
+demo-common /demo-service/demo-controller
+
+## 四、打包入口模块 demo-bootstrap（重点！）
+
+> 存放 SpringBoot 启动类 `DemoApplication.java`，`resources/logback-spring.xml`、application.yml 这个模块引入所有上层业务模块，**spring-boot-maven-plugin 放在这里**
+
+### 五 、启动类（demo-bootstrap）包扫描
+
+> **必须扫描到其他模块的包！** 多模块最常见坑：只扫描当前模块，common/service 的 Bean 无法注入。
+
+# 多模块不同jar包
 
 # RAG智能客服实战
 
