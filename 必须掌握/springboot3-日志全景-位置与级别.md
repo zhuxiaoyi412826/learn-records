@@ -334,3 +334,5 @@ docker run --log-driver=json-file --log-opt max-size=10m --log-opt max-file=3 ..
 5. **结论**：慢 SQL 拖长事务 → 连接池排队 → GC 压力。加索引 + 拆事务，曲线恢复
 
 四层日志各出一份证据，交叉印证才敢下结论——这就是"全景日志"的意义。
+
+## 十一、日志文件种类

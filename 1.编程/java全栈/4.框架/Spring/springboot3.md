@@ -4,29 +4,35 @@
 
 1. **能快速搭建各种 Spring Boot 项目 理解自动配置 选场景 定制化组件 导入配置 测试** 
 
-2. **会自己debug项目，开发新功能。了解web会话管理，HTTP 等**
+2. **能手动创建springboot项目，把普通maven项目改造为springboot项目  starter与parent和自定义starter**
 
-3. **能做登录、权限、文件上传、分页、异常处理 、token 权限管理 、支付等各种业务**
+3. **使用内置的tomcat服务器不使用内置的tomcat，使用其他的**
 
-4. **面试能讲清自动装配、事务、Bean 生命周期等底层原理；**
+4. springframework Environment 自动装配原理
 
-5. **具备整合各类中间件、配置各种数据库、部署上线、简单性能调优能力；**
+5. **会自己debug项目，开发新功能。了解web会话管理，HTTP 等**
 
-6. **可独立开发中小型单体后端接口项目；**
+6. **能做登录、权限、文件上传、分页、异常处理 、token 权限管理 、支付等各种业务**
 
-7. **能看懂企业项目结构，并增加，修改功能**
+7. **面试能讲清自动装配、事务、Bean 生命周期等底层原理；**
 
-8. **独立搭建一套标准后台管理接口项目，包含用户、角色、权限基础模块**
+8. **具备整合各类中间件、配置各种数据库、部署上线、简单性能调优能力；**
 
-9. **规范分层架构：Controller / Service / Mapper / Entity / DTO / VO 分层规范，会使用API接口测试**
+9. **可独立开发中小型单体后端接口项目；**
 
-10. **掌握开发规范：常量类、工具类封装、枚举统一管理、代码复用抽取**
+10. **能看懂企业项目结构，并增加，修改功能**
 
-11. **能排查常见报错：循环依赖、事务失效、跨域、配置读取失败、连接池耗尽等线上问题**
+11. **独立搭建一套标准后台管理接口项目，包含用户、角色、权限基础模块**
 
-12. **性能优化方向：连接池调参、接口分页、缓存减少 DB 查询、异步处理耗时任务**
+12. **规范分层架构：Controller / Service / Mapper / Entity / DTO / VO 分层规范，会使用API接口测试**
 
-13. **jdk日志分析处理，logback日志输出**
+13. **掌握开发规范：常量类、工具类封装、枚举统一管理、代码复用抽取**
+
+14. **能排查常见报错：循环依赖、事务失效、跨域、配置读取失败、连接池耗尽等线上问题**
+
+15. **性能优化方向：连接池调参、接口分页、缓存减少 DB 查询、异步处理耗时任务**
+
+16. **jdk日志分析处理，logback日志输出**
 
     ****
 
@@ -2278,9 +2284,9 @@ Web场景的Spring容器启动，在onRefresh的时候，会调⽤创建web服�
 
 3. @EnableWebMvc 导⼊  WebMvcConfigurationSupport  导致  WebMvcAutoConfiguratio n  失效。导致禁⽤了默认⾏为
 
-● @EnableWebMVC 禁⽤了 Mvc的⾃动配置 
+@EnableWebMVC 禁⽤了 Mvc的⾃动配置 
 
-●WebMvcConfigurer 定义SpringMVC底层组件的功能类
+WebMvcConfigurer 定义SpringMVC底层组件的功能类
 
 
 
@@ -2359,6 +2365,8 @@ SpringBoot Web 开发场景 **3 种配置方式**：
 函数式 Web 是 Spring 5.2+ 推出的无注解 Web 编程模型，用 RouterFunction 定义路由、HandlerFunction 处理请求，路由与业务分离，适配 WebFlux 响应式，代码更简洁、灵活、可测试。
 
 # 高级开发
+
+## 完整启动流程
 
 ## 自动配置
 
@@ -2628,6 +2636,8 @@ spring-boot-starter  导⼊了⼀个包  都是各种场景的 spring-boot-autoc
 
 ### **属性绑定**
 
+> 属性绑定：把 `application.yml/application.properties` 里的外部配置自动注入到 Java Bean。
+
 ```
 @ConfigurationProperties： 声明组件的属性和配置⽂件哪些前缀开始项进⾏绑定
 @EnableConfigurationProperties：快速注册注解：
@@ -2678,7 +2688,7 @@ SpringBoot框架的框架、底层基于Spring。能调整每⼀个场景的底�
 
 ## 原理
 
-SpringBoot事务管理
+## SpringBoot事务管理
 
 # 场景整合
 
@@ -2687,6 +2697,176 @@ SpringBoot事务管理
 ## 持久层开发
 
 ## SSM整合
+
+## Lomback
+
+> Lombok：**编译期注解处理器**，编译 AST 语法树阶段自动生成 Java 样板代码（get/set、构造器、日志等），源码无冗余，**运行期无任何依赖**
+>
+> ⚠️ 注意：Lombok 是编译期注解处理器，运行时不需要包，所以 scope 设为 provided/compileOnly。
+>
+> IDEA 必须安装 Lombok 插件，否则编辑器报红。
+
+**maven依赖**
+
+```
+<dependency>
+    <groupId>org.projectlombok</groupId>
+    <artifactId>lombok</artifactId>
+    <optional>true</optional>
+</dependency>
+```
+
+### 一、核心实体类注解（POJO/DTO/VO/DO 最常用）
+
+| 注解                       | 作用                                                         | 使用场景 & 坑点                                              |
+| -------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| `@Getter`                  | 生成 get 方法；可加类 / 字段                                 | final 字段只会生成 get，不会生成 set                         |
+| `@Setter`                  | 生成 set 方法；可加类 / 字段                                 | final 字段不会生成 setter                                    |
+| `@ToString`                | 自动生成 toString ()                                         | **密码、敏感字段一定要 exclude**继承类必须开启 callSuper     |
+| `@EqualsAndHashCode`       | 生成 equals、hashCode                                        | 继承父类实体必须开启 callSuper，否则相等判断错误             |
+| `@NoArgsConstructor`       | 无参构造                                                     | Mybatis、Jackson 反序列化**必须有无参构造**                  |
+| `@AllArgsConstructor`      | 全参构造                                                     | 慎用；加了之后默认无参构造消失                               |
+| `@RequiredArgsConstructor` | 只给`final`、`@NonNull`字段生成构造器                        | ✅Spring 推荐**构造器注入**，业务 Service 首选！              |
+| `@Data`                    | 组合注解 = @Getter+@Setter+@ToString+ @EqualsAndHashCode+@RequiredArgsConstructor` | ⚠️继承场景慎用！默认不处理父类属性，需要手动加`@ToString(callSuper=true)`、`@EqualsAndHashCode(callSuper=true)` |
+| `@Value`                   | 不可变值对象，全字段默认 private final，无 setter，全参构造 + get+toString+equals | DTO、值对象，创建后不允许修改；适合消息实体                  |
+| `@Builder`                 | 建造者模式，链式构建对象                                     | DTO、消息对象链式赋值；**和继承搭配用 @SuperBuilder**        |
+| `@SuperBuilder`            | 继承场景的建造者（替代 @Builder，支持父类属性）              | 父子类都要加 @SuperBuilder，IM 消息实体继承场景用            |
+
+### 二、日志注解（你 logback 日志体系，重点！）
+
+| 注解          | 底层日志门面                           | 使用场景                                                     |
+| ------------- | -------------------------------------- | ------------------------------------------------------------ |
+| `@Slf4j`      | SLF4J（**SpringBoot 默认，项目首选**） | 生成`private static final Logger log = LoggerFactory.getLogger(当前类.class);` |
+| `@Slf4jX`     | SLF4J 带 MDC 增强                      | 较少用                                                       |
+| `@Log4j2`     | Log4j2                                 | 项目用 log4j2 才用                                           |
+| `@CommonsLog` | Apache Commons Logging                 | 老项目                                                       |
+
+```
+@RestController
+@Slf4j
+public class ChatController {
+    public void sendMsg(){
+        log.info("发送消息"); // 直接使用log对象
+    }
+}
+
+```
+
+### 工具增强注解（业务代码高频）
+
+1. `@NonNull`
+
+   作用：构造器 / 方法参数非空校验，null 直接抛 NPE。
+
+   ```
+   public void send(@NonNull ChatMsg msg){
+       // 自动生成if(msg == null) throw NPE
+   }
+   ```
+
+2. `@SneakyThrows`
+
+   自动捕获受检异常，
+
+   不强制 throws 声明
+
+   （简化代码，底层捕获包装，生产谨慎）
+
+   ```
+   @SneakyThrows
+   public void readFile(){
+       Files.readAllBytes(Paths.get("test.txt"));
+   }
+   ```
+
+3. `@Cleanup`
+
+   自动资源关闭，替代 try-with-resources，自动调用 close ()
+
+   ```
+   @Cleanup InputStream in = new FileInputStream("a.txt");
+   ```
+
+4. `@Synchronized`
+
+   替代
+
+   ```
+   synchronized
+   ```
+
+   关键字，锁是
+
+   私有对象锁，不是 this
+
+   ，防止外部恶意锁对象
+
+   ```
+   @Synchronized
+   public void syncTask(){}
+   ```
+
+5. `val` / `var`（局部变量）
+
+   - `val`：局部变量，自动推断类型，**final**
+   - `var`：局部变量，自动推断类型，非 final
+
+   ```
+   val list = new ArrayList<String>();
+   var name = "algo";
+   ```
+
+6. `@UtilityClass`
+
+   标记工具类，自动私有构造，所有成员 static，不能 new
+
+   ```
+   @UtilityClass
+   public class MsgUtil{}
+   ```
+
+### 注意事项
+
+1. @Data 继承父类坑
+
+   @Data 自带的
+
+   ```
+   ToString、EqualsAndHashCode
+   ```
+
+   默认不包含父类字段
+
+   ，继承实体必须手动补充：
+
+   ```
+   @Data
+   @ToString(callSuper = true)
+   @EqualsAndHashCode(callSuper = true)
+   public class ChatMsgDTO extends BaseEntity {}
+   ```
+
+2. Jackson 序列化坑
+
+   - `@NoArgsConstructor`缺失：JSON 反序列化直接报错（Mybatis+JSON 场景必有无参构造）
+   - `@Builder`：单独使用 @Builder 会**移除默认无参构造**，需要额外加上`@NoArgsConstructor`
+
+3. **final 字段**：@Setter 不会为 final 字段生成 set 方法
+
+4. **@RequiredArgsConstructor + @Service** 只对`final / @NonNull`字段生成构造器，**SpringBoot 推荐构造器注入，替代 @Autowired**，无循环依赖隐患，单元测试友好
+
+5. **不要在 @Data 实体写业务逻辑**；敏感字段（密码、手机号）必须
+
+   ```
+   @ToString.Exclude
+   ```
+
+   ```
+   @ToString.Exclude
+   private String password;
+   ```
+
+6. **Lombok 编译期生效**：源码看不到 get/set，编译后 class 文件才有；Git 提交源码看不到生成方法，团队成员 IDE 必须装插件
 
 ## knif4j文档
 
@@ -2777,10 +2957,6 @@ demo-common /demo-service/demo-controller
 > **必须扫描到其他模块的包！** 多模块最常见坑：只扫描当前模块，common/service 的 Bean 无法注入。
 
 # 多模块不同jar包
-
-# RAG智能客服实战
-
-# 聊天项目智能实战
 
 # Reactive Stack
 

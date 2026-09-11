@@ -399,6 +399,10 @@ logback pattern 加 `%X{traceId}`：
 
 ***
 
+### 6.8 日志文件种类
+
+慢SQL日志 慢接口日志  慢外部调用接口  info error worring 日志  GC  JVM 异常堆转储 线程转储 ThreadDump
+
 ## 七、异常处理规范
 
 ```
