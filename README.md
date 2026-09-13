@@ -519,34 +519,9 @@
 - 事件循环：宏任务/微任务、EventLoop 机制
 - 深浅拷贝、防抖节流、柯里化、偏函数
 
-#### 2.3 Vue 3 全家桶（重点）
+## 框架
 
-- 组合式 API：setup、ref、reactive、computed、watch、生命周期钩子
-- 响应式原理：Vue2 Object.defineProperty vs Vue3 Proxy
-- Vue Router 4：路由守卫、动态路由、路由懒加载
-- Pinia 状态管理：替代 Vuex，更简洁
-- Vite 构建工具：比 Webpack 快的原因
-- 组件通信方式：props/emit、provide/inject、Pinia、事件总线
-
-#### 2.4 TypeScript
-
-- 类型系统：基本类型、接口、泛型、枚举、联合类型、类型守卫
-- 在 Vue3 项目中使用 TS
-
-#### 2.5 工程化与工具
-
-- 包管理器：npm / pnpm / yarn
-- 构建工具：Webpack / Vite / Rollup
-- 代码规范：ESLint、Prettier、Husky + lint-staged
-
-#### 2.6 主流 UI 组件库
-
-- PC 端：Element Plus（Vue3）、Ant Design Vue
-- 移动端：Vant、NutUI
-
-## vue
-
-### 5.1 Vue 3 基础
+###  Vue 
 
 #### 1. Vue 3 核心
 
@@ -572,13 +547,25 @@
 - 基本类型、接口、泛型、联合类型
 - 在 Vue 3 中使用 TS
 
-### 5.2 UI 组件库
+### Recat
+
+### UI 组件库
 
 - **Element Plus**：PC 端最常用
 - 常用组件：表单、表格、对话框、分页、上传、树形控件
 - 组件二次封装：通用表格、通用表单、通用弹窗
 
-### 5.3 工程化
+### js
+
+> JS 是动态弱类型，运行时检查；TS 在 JS 基础增加静态类型，编译阶段校验，最终编译输出 JS 执行，适合大型前端项目。
+>
+> Node.js 是基于 V8 JavaScript 引擎的服务端 JS 运行时，让 JavaScript 脱离浏览器，可以在服务器、本地命令行执行代码
+
+Node.js 
+
+TS
+
+### 工程化
 
 - Vite 构建工具
 - 项目结构规范
@@ -586,18 +573,13 @@
 - 环境变量：开发环境、生产环境
 - 代码规范：ESLint + Prettier
 
-### 5.4 前端实战
+### 跨平台
 
-- 登录注册页面
-- 后台管理系统布局（侧边栏 + 顶栏 + 主内容区）
-- 用户管理 CRUD 页面
-- 角色权限管理
-- 图表展示：ECharts
-- AI 对话页面（流式输出、打字机效果）
-- 图片生成页面
-- 知识库管理页面
+**Electron**：老牌桌面跨端框架，打包自带完整 Chromium + Node.js
 
-## WEB技术栈
+**Tauri2**：Tauri2 以 Rust 作为原生层，复用操作系统自带 WebView 而不捆绑浏览器内核
+
+## WEB开发
 
   XML Tomcat HTTP协议   Nginx Git  等 Ajax JSON Jquery  Maven Docker Redis
 
@@ -662,97 +644,19 @@
 
 ## 会话控制
 
-- **Cookie**：原理、生命周期、域和路径、常用 API、禁用 Cookie 解决方案
-- **Session**：原理、生命周期、钝化活化、销毁时机、Session 追踪机制
-- Cookie 与 Session 的区别、分布式环境下 Session 共享方案
-
-## 文件上传下载 & OSS 存储
-
-- 本地文件上传：表单配置、MultipartFile 接收、文件大小限制、文件名防重
-- 文件下载：响应头设置、字节流输出、中文文件名乱码处理
-- 阿里云 OSS/MinIO：对象存储概念、SDK 集成、签名上传、文件访问权限管理
+- **Cookie**：是**浏览器端存储的一小段文本**，由服务端通过 `Set-Cookie` 响应头下发；**浏览器后续同源请求自动带上 Cookie**
+- **Session**：Session 是**服务端会话**，Cookie 用来传递 sessionId
+- **Token**: 登录成功，后端生成 Token（JWT）返回给客户端，**由客户端自己保存**（localStorage / 内存），每次请求放在请求头
 
 ## API规范
 
-- API 协议 / 风格：REST、JSON API、SOAP、gRPC、GraphQL、HATEOAS
+- API 协议 / 风格：**REST**、JSON API、SOAP、**gRPC**、**GraphQL**、HATEOAS
 - API 规范：开放 API 规格（OpenAPI）
-- 身份认证方式：基本认证、Cookie 认证、令牌认证、OAuth、JWT、SAML、OpenID
-- API 规范：统一返回码、参数校验、接口限流、版本控制、文档自动生成（Swagger/OpenAPI）
-- 安全攻防落地：SQL 注入、XSS、CSRF、DDoS 防护、敏感数据脱敏、数据加密 AES/RSA
-- 权限体系：RBAC 权限模型、接口黑白名单、接口鉴权链路设计
-
-## 接口文档 
-
-这份文档以思维导图形式完整覆盖**API 全生命周期设计体系**，整体分为**构建 API、API 认证与授权、API 安全、API 测试、API 文档与管理、配套工具**六大核心模块，逐层拆解 API 从概念定义到落地运维的完整知识体系，各板块详细梳理如下：
-
-### 一、构建 API（API 基础开发与类型体系）
-
-本模块是 API 入门核心，先厘清基础概念，再划分主流 API 技术类型、规范与架构风格。
-
-1. **基础概念：什么是 API** 拆解 API 核心基础定义，区分三类基础接口模型：**公共接口、私有接口、内部接口**。
-2. **HTTP 体系 API 细分** 梳理 HTTP 生态下各类 API：HTTP 接口、HTTP REST API、HTTP JSON API、HTTP 表单 API、HTTP 文件 API，覆盖日常开发绝大多数 HTTP 接口场景。
-3. 主流 API 架构风格
-   - RESTful API：当下最通用架构，配套规范包含资源命名、HTTP 动词、状态码、分页、过滤、排序、版本、缓存、错误处理；
-   - GraphQL API：独立查询式接口方案，单独作为分支列出；
-   - SOAP API：传统 XML 接口标准；
-   - gRPC API：高性能二进制接口，配套 Protobuf 序列化；
-   - RPC NODE/HTTP API：轻量 RPC 分支方案。
-4. **API 分层设计规范** 包含分层、资源命名、参数规范、响应格式、错误处理五大落地设计细则。
-
-### 二、API 认证与授权（接口身份校验 + 权限管控）
-
-解决「谁能访问、能访问哪些资源」的安全准入问题，分为认证、授权两大分支。
-
-1. **认证方法（身份核验）** 罗列行业主流认证方案：基础认证、密钥认证、Token 令牌认证、会话认证、证书认证。
-
-2. 授权方法（权限分配）
-
-   区分三套成熟授权协议 / 框架：
-
-   - 基于密码的授权（OAuth1）；
-   - 基于令牌的授权（OAuth2）；
-   - 基于身份的授权（OIDC，OpenID Connect）； 配套衍生标准：API 密钥、JWT 令牌。
-
-3. **配套扩展体系** 补充 HMAC-SHA 签名校验、API 访问限流、API 跨域访问控制（CORS）三大辅助准入机制。
-
-### 三、API 安全（接口全链路防护体系）
-
-覆盖接口传输、调用、数据全维度安全防护手段，分为通用防护、传输安全、数据安全三类：
-
-1. **常规漏洞防御**：防注入攻击、防跨站伪造、防越权访问；
-2. **传输层安全**：HTTPS 加密、TLS/SSL 证书、请求签名校验；
-3. **数据层安全**：数据脱敏、敏感字段加密、接口请求频率限流。
-
-### 四、API 测试（接口质量验证体系）
-
-完整覆盖 API 全类型测试方案，从功能到自动化、性能全覆盖：
-
-1. 测试分类
-   - 功能测试：单元测试、集成测试、场景测试；
-   - 性能测试：并发压测、负载测试、稳定性测试；
-   - 自动化测试：脚本自动化、流水线集成测试、契约测试。
-2. **配套测试工具** 列举主流测试客户端：Postman、Insomnia、SoapUI、JMeter。
-
-### 五、API 文档与管理（接口标准化、生命周期运维）
-
-负责 API 标准化交付、版本管控与线上治理，分为文档规范、版本管理、监控告警：
-
-1. **API 文档规范** 主流文档标准：OpenAPI（Swagger）、RAML、API Blueprint；规范包含接口入参、出参、错误码、示例、权限说明。
-2. **API 版本管理** 多套版本控制方案：URL 路径版本、请求头版本、参数版本；配套兼容、弃用、灰度发布策略。
-3. 监控与运维治理
-   - 监控指标：响应耗时、错误率、调用量、成功率；
-   - 告警机制：异常阈值告警、日志追踪；
-   - 流量治理：灰度、熔断、降级、限流、缓存策略。
-
-### 六、配套工具与平台落地
-
-梳理 API 设计、开发、调试、部署全流程工具链：
-
-1. **调试工具**：Postman、Apifox、curl；
-2. **网关平台**：Kong、Nginx、Spring Cloud Gateway；
-3. **文档生成工具**：Swagger UI、Redoc；
-4. **自动化 / CI 工具**：Jenkins、Git 流水线、自动化测试脚本；
-5. **低代码 API 平台**：可视化 API 构建、在线调试平台
+- **身份认证方式**：基本认证、Cookie 认证、令牌认证、OAuth、JWT、SAML、OpenID
+- **OpenAPI (接口描述规范**):用 YAML/JSON 描述 REST 接口,请求路径、请求方法、请求参数、请求体、响应、状态码、数据模型。
+- [Swagger](https://github.com/swagger-api/swagger-ui)/[Knife4](https://github.com/xiaoymin/knife4j): OpenAPI 规范的 UI 渲染工具，用来可视化展示、在线调试文档，统一返回码、参数校验、接口限流、版本控制、文档自动生成.
+- **安全攻防落地**：SQL 注入、XSS、CSRF、DDoS 防护、敏感数据脱敏、数据加密 AES/RSA
+- **权限体系**：RBAC 权限模型、接口黑白名单、接口鉴权链路设计,[sa-token](https://github.com/dromara/sa-token) [springsecuity](https://github.com/spring-projects/spring-security)
 
 ## 数据库文档
 
@@ -826,13 +730,6 @@
 13. **区分逻辑删除还是物理删除；**
 14. **ER 图画出一对多关系（用户 1 对多订单）；**
 15. **公共字段统一一套（create_time、is_deleted）。**
-
-## 安全
-
-- 网络安全基础：HTTPS、SSL/TLS、跨域资源共享（CORS）
-- 服务器安全、API 安全最佳实践
-- OWASP 安全风险
-- 密码哈希算法：MD5、scrypt、bcrypt owasp 对称加密非对称加密
 
 # 框架
 
@@ -1075,6 +972,10 @@
 
 ### 6.场景导入
 
+Redis 
+
+knf4ij
+
 
 
 ## 6. Spring AI
@@ -1263,7 +1164,7 @@
 - **语音能力**：TTS 语音合成、ASR 语音识别
 - **视频生成**：异步任务处理、状态轮询
 
-## 代码规范
+## 项目规范
 
 **完整链路请求：**  SpringBoot 接收请求 → 参数校验 → 登录鉴权 (JWT) →会话管理 → 业务逻辑 → 调用数据库 → 返回结果，全局异常处理→ 返回前端渲染
 
@@ -2529,6 +2430,62 @@ shell
 跟李沫学AI 动手学深度学习v2  
 
  跟李沫学AI实用机器学习中文版
+
+## 流程图
+
+> **mermaid  D2 Graphviz支持 **
+>
+> draw.io：开源拖拽绘图工具，支持流程图、UML、ER、架构图，还能导入 Mermaid/PlantUML 代码。
+>
+> Excalidraw：手绘风格白板绘图，适合草稿、架构草图，支持时序、流程、ER。
+
+1. flowchart：流程图，用于展示步骤与分支流转逻辑。
+2. sequenceDiagram：时序图，按时间顺序描述多方参与者之间消息交互。
+3. classDiagram：类图，描述类、接口、属性方法以及继承关联关系。
+4. erDiagram：ER 实体关系图，表达数据库实体之间的关联约束。
+5. gantt：甘特图，展示项目任务时间排期与进度。
+6. pie：饼图，直观呈现各项数据占比。
+7. stateDiagram：状态图，描述对象在不同事件下的状态切换。
+8. journey：用户旅程图，描述用户完成任务的操作步骤与体验。
+9. gitGraph：Git 分支图，可视化代码提交与分支合并流程。
+10. mindmap：思维导图，层级化展示知识、模块结构。
+11. C4：C4 架构图，分层描述软件系统架构，从业务上下文到组件细节。
+12. radar：雷达图，多维对比多个指标的能力值。
+13. requirementDiagram：需求图，管理需求、约束与测试用例之间关系
+
+**ECharts**
+
+> Chart.js：轻量 Canvas 图表库，开箱即用，原生支持雷达图、折线、柱状，适合简单监控面板
+>
+> D3.js：底层数据驱动可视化库，基于 SVG/Canvas，自由度最高，几乎能绘制任意图形，上手难
+>
+> AntV/G2（阿里）：企业级可视化库，适合中后台，G2Plot 封装了雷达图等常用图表
+
+- bar 柱状图：用于分类数据大小对比
+- line 折线图：展示数据随时间变化趋势，支持面积图
+- pie 饼图：展示各分项占整体的比例，支持环形图
+- scatter 散点图：分析两个变量之间相关性，支持气泡图
+- radar 雷达图：多维指标综合对比（你的后端性能六边形蛛网图）
+- candlestick K 线图：金融 K 线，展示开盘 / 收盘 / 最高 / 最低
+- gauge 仪表盘：单个指标进度监控（CPU 使用率、内存使用率）
+- candlestick K 线图：金融 K 线，展示开盘 / 收盘 / 最高 / 最低
+- gauge 仪表盘：单个指标进度监控（CPU 使用率、内存使用率）
+- funnel 漏斗图：展示业务流程转化率
+- heatmap 热力图：二维密度、热度分布
+- tree 树图：层级树形结构展示
+- treemap 矩形树图：用面积表达层级 + 数值大小
+- sunburst 旭日图：多层级环形占比展示
+- graph 关系图：节点与连线，适合好友关系、拓扑网络
+- sankey 桑基图：流量、能量、消息流转流向
+- boxplot 箱线图：统计数据分布，识别异常值
+- parallel 平行坐标图：超多维度数据可视化
+- map 地图：地理区域数据展示（全国 / 省份分布）
+- lines 路径图：地理上的连线轨迹
+- themeRiver 主题河流图：多类别时序流量变化
+- pictorialBar 象形柱图：图形化柱状图，可视化美化
+- custom 自定义系列：自由绘制任意自定义图形（万能扩展
+
+## 可视化
 
 # 项目开发总结规范
 
