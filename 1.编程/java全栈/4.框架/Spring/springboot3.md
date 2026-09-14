@@ -1663,6 +1663,974 @@ target/xxx.war
 
 # WEB开发
 
+## springMVC
+
+> 一句话前置：SpringBoot 引入`spring-boot-starter-web`自动集成 SpringMVC，无需手动配置 DispatcherServlet；RESTful 是接口设计规范，用 HTTP 动词表达资源操作，URL 只代表资源名词，不包含动词
+
+### RESTful 规范核心（接口约定）
+
+| HTTP 方法 | 作用         | 接口示例                                                     | Http 状态码          |
+| --------- | ------------ | ------------------------------------------------------------ | -------------------- |
+| GET       | 查询资源     | `GET /api/users` 查询全部用户`GET /api/users/{id}` 查询单个用户 | 200 成功 /404 不存在 |
+| POST      | 创建资源     | `POST /api/users` 新增用户                                   | 201 Created          |
+| PUT       | 全量更新资源 | `PUT /api/users/{id}` 修改用户                               | 200 成功             |
+| DELETE    | 删除资源     | `DELETE /api/users/{id}` 删除用户                            | 204 NoContent        |
+
+> ❌ 不规范：`/getUser` `/addUser`（URL 带动词）
+>
+>  ✅ 规范：`/api/users`（名词复数，用 HTTP 方法区分动作）
+
+### 创建springboot基础项目 
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/20260914201127.png)
+
+勾选 springweb lombok
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/20260914201203.png)
+
+启动访问测试
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/20260914201320.png)
+
+查看maven依赖
+
+> `spring-boot-starter-web` **内置 SpringMVC + Tomcat + Jackson 序列化**，自动装配，不用单独引入 springmvc 包
+
+```
+<dependencies>
+    <!-- web: SpringMVC核心 -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <!-- lombok简化get/set -->
+    <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <optional>true</optional>
+    </dependency>
+</dependencies>
+
+```
+
+启动类
+
+```
+package com.example.restdemo;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication //自动开启SpringMVC自动配置
+public class RestDemoApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(RestDemoApplication.class, args);
+    }
+}
+
+```
+
+### 分层开发
+
+**实体类 包名 entity**
+
+```
+package com.example.restdemo.entity;
+import lombok.Data;
+
+@Data
+public class User {
+    private Long id;
+    private String username;
+    private String email;
+}
+```
+
+统一返回结果，前后端交互标准json
+
+```
+package com.example.restdemo.vo;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Result<T> {
+    private Integer code;
+    private String msg;
+    private T data;
+
+    public static <T> Result<T> success(T data) {
+        return new Result<>(200, "success", data);
+    }
+    public static <T> Result<T> error(Integer code, String msg) {
+        return new Result<>(code, msg, null);
+    }
+}
+
+```
+
+controller层核心 springmvc接受请求
+
+`@RestController = @Controller + @ResponseBody`，直接返回 JSON，**不跳转视图**Sprin...
+
+```
+package com.example.restdemo.controller;
+
+import com.example.restdemo.entity.User;
+import com.example.restdemo.vo.Result;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+
+@RestController
+@RequestMapping("/api/users") //统一接口前缀：资源名词 users
+public class UserController {
+    //模拟数据库，线程安全Map
+    private final Map<Long, User> db = new ConcurrentHashMap<>();
+    private final AtomicLong idGen = new AtomicLong(1);
+
+    //1. GET 查询全部用户
+    @GetMapping
+    public Result<List<User>> list() {
+        return Result.success(new ArrayList<>(db.values()));
+    }
+
+    //2. GET 查询单个用户 @PathVariable 取路径变量 {id}
+    @GetMapping("/{id}")
+    public ResponseEntity<Result<User>> getOne(@PathVariable Long id) {
+        User user = db.get(id);
+        if(user == null){
+            //404
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Result.error(404,"用户不存在"));
+        }
+        return ResponseEntity.ok(Result.success(user));
+    }
+
+    //3. POST 创建用户 @RequestBody 接收前端JSON请求体
+    @PostMapping
+    public ResponseEntity<Result<User>> create(@RequestBody User user) {
+        long newId = idGen.getAndIncrement();
+        user.setId(newId);
+        db.put(newId, user);
+        //创建成功返回201
+        return ResponseEntity.status(HttpStatus.CREATED).body(Result.success(user));
+    }
+
+    //4. PUT 全量更新用户
+    @PutMapping("/{id}")
+    public ResponseEntity<Result<User>> update(@PathVariable Long id, @RequestBody User user) {
+        if(!db.containsKey(id)){
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Result.error(404,"用户不存在"));
+        }
+        user.setId(id);
+        db.put(id, user);
+        return ResponseEntity.ok(Result.success(user));
+    }
+
+    //5. DELETE 删除用户
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id){
+        if(!db.containsKey(id)){
+            return ResponseEntity.notFound().build();
+        }
+        db.remove(id);
+        //204 NoContent 无返回体
+        return ResponseEntity.noContent().build();
+    }
+}
+
+```
+
+### 测试接口功能（Postman / ApiPost /curl）
+
+1. 查询列表：`GET http://127.0.0.1:8080/api/users`
+2. 新增用户：`POST http://127.0.0.1:8080/api/users`
+
+```
+{
+    "username":"zhangsan",
+    "email":"zhangsan@test.com"
+}
+```
+
+1. 查询单个：`GET http://127.0.0.1:8080/api/users/1`
+2. 修改：`PUT http://127.0.0.1:8080/api/users/1` + json body
+3. 删除：`DELETE http://127.0.0.1:8080/api/users/1`
+
+### **SpringMVC自定义配置(WebMvcConfig)**
+
+```
+package com.example.restdemo.config;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+    // 可配置跨域、静态资源、拦截器、消息转换器等SpringMVC能力
+}
+
+```
+
+### knf4ij
+
+**maven依赖**
+
+```
+<!-- Knife4j OpenAPI3（Boot4 Jakarta版本） -->
+        <dependency>
+            <groupId>com.github.xiaoymin</groupId>
+            <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+            <version>4.5.0</version>
+        </dependency>
+```
+
+**Knife4j 配置类 `Knife4jConfig.java`**
+
+```
+package com.example.restdemo.config;
+
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Contact;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.info.License;
+import org.springdoc.core.models.GroupedOpenApi;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class Knife4jConfig {
+
+    // 用户管理接口分组
+    @Bean
+    public GroupedOpenApi userApi() {
+        return GroupedOpenApi.builder()
+                .group("用户管理接口")
+                .pathsToMatch("/api/users/**")
+                .build();
+    }
+
+    // 文档基础信息
+    @Bean
+    public OpenAPI customOpenAPI() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("SpringBoot4 RESTful 用户管理API文档")
+                        .description("SpringBoot4 + SpringMVC RESTful风格接口演示")
+                        .version("v1.0.0")
+                        .contact(new Contact().name("开发人员").email("demo@test.com"))
+                        .license(new License().name("Apache 2.0"))
+                );
+    }
+}
+
+```
+
+**application.yml**
+
+```
+knife4j:
+  enable: true
+  production: false # 生产环境改为true，关闭文档
+  setting:
+    language: zh_cn
+    enable-footer: false
+springdoc:
+  swagger-ui:
+    tags-sorter: alpha
+    operations-sorter: alpha
+
+```
+
+**实体 User.java（OpenAPI 注解不变）**
+
+```
+@Data
+@Schema(description = "用户实体")
+public class User {
+    @Schema(description = "用户主键ID", example = "1")
+    private Long id;
+    @Schema(description = "用户名", example = "zhangsan")
+    private String username;
+    @Schema(description = "邮箱", example = "zhangsan@test.com")
+    private String email;
+}
+```
+
+**统一返回结果对象**
+
+```
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Schema(description = "统一接口返回对象")
+public class Result<T> {
+    @Schema(description = "响应码 200成功", example = "200")
+    private Integer code;
+    @Schema(description = "提示信息", example = "success")
+    private String msg;
+    @Schema(description = "业务返回数据")
+    private T data;
+```
+
+**UserController RESTful 控制器**
+
+```
+@RestController
+@RequestMapping("/api/users")
+@Tag(name = "用户管理", description = "用户CRUD RESTful接口")
+public class UserController {
+    private final Map<Long, User> db = new ConcurrentHashMap<>();
+    private final AtomicLong idGen = new AtomicLong(1);
+
+    @GetMapping
+    @Operation(summary = "查询全部用户", description = "获取所有用户列表")
+    public Result<List<User>> list() {
+        return Result.success(new ArrayList<>(db.values()));
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "查询单个用户", description = "根据用户ID查询用户信息")
+    public ResponseEntity<Result<User>> getOne(
+            @Parameter(description = "用户ID", required = true)
+            @PathVariable Long id) {
+        User user = db.get(id);
+        if(user == null){
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Result.error(404,"用户不存在"));
+        }
+        return ResponseEntity.ok(Result.success(user));
+    }
+```
+
+**访问测试**
+
+```
+http://127.0.0.1:8080/doc.html
+```
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/20260914203759.png)
+
+**架构图**
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/mermaid (3).png)
+
+## Service+MybatisPlus+H2
+
+### 目录结构
+
+```
+src/main/java/com/example/restdemo
+├── RestDemoApplication.java
+├── config
+│   ├── Knife4jConfig.java
+│   └── MyBatisPlusConfig.java
+├── controller   #5个controller
+├── entity       #5张表实体
+├── mapper       #5个mapper接口
+├── service
+│   ├── impl     #service实现类
+│   └── *.java   #service接口
+└── vo
+    └── Result.java
+
+src/main/resources
+├── application.yml
+└── schema-h2.sql
+```
+
+### POM依赖
+
+```
+<!-- H2数据库 -->
+<dependency>
+    <groupId>com.h2database</groupId>
+    <artifactId>h2</artifactId>
+    <scope>runtime</scope>
+</dependency>
+<!-- MyBatis-Plus 适配SpringBoot4 -->
+<dependency>
+    <groupId>com.baomidou</groupId>
+    <artifactId>mybatis-plus-boot-starter</artifactId>
+    <version>3.5.7</version>
+</dependency>
+ <!-- 分页插件必须单独引入！！ -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+            <version>3.5.17</version>
+        </dependency>
+```
+
+### application.yml 完整配置
+
+```
+# 服务端口
+server:
+  port: 8080
+
+# H2数据库配置
+spring:
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:hrdb;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true #开启H2网页控制台
+      path: /h2-console #访问地址 http://127.0.0.1:8080/h2-console
+
+# MyBatis-Plus配置
+mybatis-plus:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.example.restdemo.entity
+  configuration:
+    map-underscore-to-camel-case: true #下划线转驼峰
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl #打印SQL日志
+  global-config:
+    db-config:
+      id-type: auto #主键自增
+
+# Knife4j
+knife4j:
+  enable: true
+  production: false
+  setting:
+    language: zh_cn
+    enable-footer: false
+    enable-swagger-models: true
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    tags-sorter: alpha
+    operations-sorter: alpha
+```
+
+建表SQL 
+
+resources/schema-h2.sql  H2启动自动执行
+
+```
+-- 1.部门 dept
+CREATE TABLE IF NOT EXISTS dept (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    dept_name VARCHAR(50) NOT NULL COMMENT '部门名称',
+    location VARCHAR(100) COMMENT '部门地点'
+);
+
+--2.岗位 job
+CREATE TABLE IF NOT EXISTS job (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    job_name VARCHAR(50) NOT NULL COMMENT '岗位名称',
+    job_desc VARCHAR(200) COMMENT '岗位描述'
+);
+
+--3.员工 emp
+CREATE TABLE IF NOT EXISTS emp (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    emp_name VARCHAR(50) NOT NULL COMMENT '员工姓名',
+    dept_id INT COMMENT '所属部门ID',
+    job_id INT COMMENT '岗位ID',
+    entry_date DATE COMMENT '入职日期',
+    FOREIGN KEY (dept_id) REFERENCES dept(id),
+    FOREIGN KEY (job_id) REFERENCES job(id)
+);
+
+--4.薪资 salary
+CREATE TABLE IF NOT EXISTS salary (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    emp_id INT NOT NULL COMMENT '员工ID',
+    base_salary DECIMAL(10,2) COMMENT '基本工资',
+    bonus DECIMAL(10,2) COMMENT '奖金',
+    month VARCHAR(20) COMMENT '薪资月份',
+    FOREIGN KEY (emp_id) REFERENCES emp(id)
+);
+
+--5.项目 project
+CREATE TABLE IF NOT EXISTS project (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    project_name VARCHAR(100) NOT NULL COMMENT '项目名称',
+    emp_id INT COMMENT '负责人员工ID',
+    start_date DATE COMMENT '开始日期',
+    FOREIGN KEY (emp_id) REFERENCES emp(id)
+);
+
+--初始化测试数据
+INSERT INTO dept(dept_name,location) VALUES ('研发部','深圳'),('市场部','广州');
+INSERT INTO job(job_name,job_desc) VALUES ('Java开发','后端开发'),('产品经理','需求设计');
+INSERT INTO emp(emp_name,dept_id,job_id,entry_date) VALUES ('张三',1,1,'2025-01-10'),('李四',2,2,'2025-02-01');
+INSERT INTO salary(emp_id,base_salary,bonus,month) VALUES (1,15000.00,3000.00,'2026-09'),(2,13000.00,2000.00,'2026-09');
+INSERT INTO project(project_name,emp_id,start_date) VALUES ('AI平台开发',1,'2026-01-01');
+```
+
+### 实体 Entity（5 个实体，带 @Schema 文档注解）
+
+**1. Dept.java 部门**
+
+```
+package com.example.restdemo.entity;
+import io.swagger.v3.oas.annotations.media.Schema;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+@Data
+@TableName("dept")
+@Schema(description = "部门实体")
+public class Dept {
+    @TableId(type = IdType.AUTO)
+    @Schema(description = "部门ID", example = "1")
+    private Integer id;
+    @Schema(description = "部门名称", example = "研发部")
+    private String deptName;
+    @Schema(description = "部门地点", example = "深圳")
+    private String location;
+}
+```
+
+**2. Job.java 岗位**
+
+```
+package com.example.restdemo.entity;
+import io.swagger.v3.oas.annotations.media.Schema;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+@Data
+@TableName("job")
+@Schema(description = "岗位实体")
+public class Job {
+    @TableId(type = IdType.AUTO)
+    @Schema(description = "岗位主键ID", example = "1")
+    private Integer id;
+    @Schema(description = "岗位名称", example = "Java开发工程师")
+    private String jobName;
+    @Schema(description = "岗位描述", example = "后端业务开发")
+    private String jobDesc;
+}
+```
+
+**3.Emp.java 员工**
+
+```
+package com.example.restdemo.entity;
+import io.swagger.v3.oas.annotations.media.Schema;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+import java.time.LocalDate;
+
+@Data
+@TableName("emp")
+@Schema(description = "员工实体")
+public class Emp {
+    @TableId(type = IdType.AUTO)
+    @Schema(description = "员工ID", example = "1")
+    private Integer id;
+    @Schema(description = "员工姓名", example = "张三")
+    private String empName;
+    @Schema(description = "所属部门ID", example = "1")
+    private Integer deptId;
+    @Schema(description = "岗位ID", example = "1")
+    private Integer jobId;
+    @Schema(description = "入职日期", example = "2025-01-10")
+    private LocalDate entryDate;
+}
+```
+
+**4.Salary.java 薪资**
+
+```
+package com.example.restdemo.entity;
+import io.swagger.v3.oas.annotations.media.Schema;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+import java.math.BigDecimal;
+
+@Data
+@TableName("salary")
+@Schema(description = "薪资实体")
+public class Salary {
+    @TableId(type = IdType.AUTO)
+    @Schema(description = "薪资记录ID", example = "1")
+    private Integer id;
+    @Schema(description = "员工ID", example = "1")
+    private Integer empId;
+    @Schema(description = "基本工资", example = "15000.00")
+    private BigDecimal baseSalary;
+    @Schema(description = "奖金", example = "3000.00")
+    private BigDecimal bonus;
+    @Schema(description = "薪资月份", example = "2026-09")
+    private String month;
+}
+```
+
+**5.Project.java 项目**
+
+```
+package com.example.restdemo.entity;
+import io.swagger.v3.oas.annotations.media.Schema;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+import java.time.LocalDate;
+
+@Data
+@TableName("project")
+@Schema(description = "项目实体")
+public class Project {
+    @TableId(type = IdType.AUTO)
+    @Schema(description = "项目ID", example = "1")
+    private Integer id;
+    @Schema(description = "项目名称", example = "AI平台开发")
+    private String projectName;
+    @Schema(description = "负责人员工ID", example = "1")
+    private Integer empId;
+    @Schema(description = "项目开始时间", example = "2026-01-01")
+    private LocalDate startDate;
+}
+```
+
+### Mapper 层（MyBatisPlus 基础 Mapper）
+
+> 以 DeptMapper 为例，其余 4 个 Mapper 写法完全一样
+
+```
+package com.example.restdemo.mapper;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.example.restdemo.entity.Dept;
+import org.apache.ibatis.annotations.Mapper;
+
+@Mapper
+public interface DeptMapper extends BaseMapper<Dept> {
+}
+```
+
+> EmpMapper / JobMapper / SalaryMapper / ProjectMapper 全部复制，替换实体即可
+
+### Service 层 接口 + 实现类（标准三层）
+
+### 接口 DeptService
+
+```
+package com.example.restdemo.service;
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.example.restdemo.entity.Dept;
+
+public interface DeptService extends IService<Dept> {
+}
+```
+
+### 实现类 DeptServiceImpl
+
+```
+package com.example.restdemo.service.impl;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.example.restdemo.entity.Dept;
+import com.example.restdemo.mapper.DeptMapper;
+import com.example.restdemo.service.DeptService;
+import org.springframework.stereotype.Service;
+
+@Service
+public class DeptServiceImpl extends ServiceImpl<DeptMapper, Dept> implements DeptService {
+}
+```
+
+> 剩下 Job、Emp、Salary、Project 的 Service 和 ServiceImpl 代码完全相同，替换实体和 Mapper。
+
+### Controller 以 DeptController 为例（RESTful + Knife4j 注解）
+
+```
+package com.example.restdemo.controller;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.example.restdemo.entity.Dept;
+import com.example.restdemo.service.DeptService;
+import com.example.restdemo.vo.Result;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/dept")
+@Tag(name = "部门管理", description = "部门CRUD RESTful接口")
+@RequiredArgsConstructor
+public class DeptController {
+    private final DeptService deptService;
+
+    @GetMapping
+    @Operation(summary = "查询全部部门", description = "获取所有部门列表")
+    public Result<List<Dept>> listAll() {
+        List<Dept> list = deptService.list();
+        return Result.success(list);
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "查询单个部门", description = "根据ID查询部门")
+    public Result<Dept> getOne(@Parameter(description = "部门ID",required = true) @PathVariable Integer id){
+        Dept dept = deptService.getById(id);
+        return Result.success(dept);
+    }
+
+    @PostMapping
+    @Operation(summary = "新增部门", description = "新增部门资源")
+    public Result<Boolean> add(@RequestBody Dept dept){
+        boolean save = deptService.save(dept);
+        return Result.success(save);
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "修改部门", description = "全量更新部门")
+    public Result<Boolean> update(@Parameter(description = "部门ID",required = true) @PathVariable Integer id, @RequestBody Dept dept){
+        dept.setId(id);
+        boolean update = deptService.updateById(dept);
+        return Result.success(update);
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "删除部门", description = "根据ID删除部门")
+    public Result<Boolean> del(@Parameter(description = "部门ID",required = true) @PathVariable Integer id){
+        boolean remove = deptService.removeById(id);
+        return Result.success(remove);
+    }
+}
+```
+
+> 其余 4 个 Controller（员工、岗位、薪资、项目）直接复制修改包名、实体、标签即可。
+
+### MyBatisPlus 分页插件配置
+
+Knife4jConfig 同目录新建 MyBatisPlusConfig.java
+
+```
+package com.example.restdemo.config;
+import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class MyBatisPlusConfig {
+    @Bean
+    public MybatisPlusInterceptor mybatisPlusInterceptor(){
+        MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+        interceptor.addInnerInterceptor(new PaginationInnerInterceptor());
+        return interceptor;
+    }
+}
+```
+
+### 启动类，增加 Mapper 扫描
+
+```
+package com.example.restdemo;
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+@MapperScan("com.example.restdemo.mapper") //扫描mapper包
+public class RestDemoApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(RestDemoApplication.class, args);
+    }
+}
+```
+
+### ✅ 访问地址清单
+
+1. Knife4j 文档：`http://127.0.0.1:8080/doc.html`
+
+   ![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/20260914222454.png)
+
+2. H2 数据库控制台：
+
+   ```
+   http://127.0.0.1:8080/h2-console
+   ```
+
+   - JDBC URL：yml里的配置  
+
+   - 内存临时测试
+
+   - ```
+     url: jdbc:h2:mem:hrdb;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false
+     ```
+
+   - 磁盘持久化
+
+   - user:sa 密码空
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/20260914222355.png)
+
+![image-20260914223428532](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20260914223428532.png)
+
+### 架构图
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/mermaid (4).png)
+
+
+
+### 日志输出
+
+application.yml 日志配置保持不变
+
+```
+logging:
+  level:
+    root: DEBUG
+    com.example.restdemo: DEBUG
+```
+
+logback-spring.xml
+
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="false">
+    <!-- 项目运行目录下log文件夹，本地开发 + jar包部署通用 -->
+    <property name="LOG_PATH" value="${user.dir}/log"/>
+
+    <!-- 控制台输出：输出 >=INFO (INFO、WARN、ERROR) -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>INFO</level>
+        </filter>
+    </appender>
+
+    <!-- DEBUG.log：全部DEBUG及以上日志，重启清空，不分割 -->
+    <appender name="ALL_FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${LOG_PATH}/DEBUG.log</file>
+        <append>false</append>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- error.log：仅ERROR级别日志，重启清空，不分割 -->
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${LOG_PATH}/error.log</file>
+        <append>false</append>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- root全局级别设为DEBUG，保证文件能拿到DEBUG日志；控制台单独过滤限制到INFO -->
+    <root level="DEBUG">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ALL_FILE"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </root>
+</configuration>
+
+```
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/mermaid (7).png)
+
+## 注解
+
+### **knfi4j**
+
+| 注解           | 作用位置                 | 含义                                                         | 示例                                                         |
+| -------------- | ------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| `@Tag`         | Controller 类上          | 给整个控制器打标签，在 Knife4j 文档上作为**接口分组名称和描述** | `@Tag(name = "用户管理", description = "用户CRUD RESTful接口")` |
+| `@Operation`   | Controller 接口方法上    | 单个接口的说明，写接口摘要、功能描述                         | `@Operation(summary = "新增用户", description = "提交JSON创建用户资源")` |
+| `@Parameter`   | 方法参数前               | 描述路径参数 / 请求参数，说明含义、是否必填、示例            | `@Parameter(description = "用户ID", required = true)`        |
+| `@Schema`      | 实体类 / VO 类、实体字段 | 描述模型（对象）或者字段说明、示例，就是你刚才在 Swagger 模特 (模型) 面板看到的内容 | `@Schema(description = "用户主键ID", example = "1")`         |
+| `@ApiResponse` | 接口方法上               | 描述接口的响应类型、响应码，用来告诉文档返回什么模型         | `@ApiResponse(responseCode = "200",description = "成功", content = @Content(...))` |
+| `@Content`     | @ApiResponse 内部        | 指定响应内容对应的模型对象，配合`@Schema`使用                | `content = @Content(schema = @Schema(implementation = Result.class))` |
+
+### **SpringMVC 原生注解（REST 接口核心）**
+
+| 注解              | 作用位置      | 含义                                                         |
+| ----------------- | ------------- | ------------------------------------------------------------ |
+| `@RestController` | Controller 类 | 组合注解 = `@Controller + @ResponseBody`，类中所有方法直接返回 JSON，不跳转页面 |
+| `@RequestMapping` | 类 / 方法     | 基础请求路由，指定 URL；派生注解：`@Get/Post/Put/DeleteMapping` |
+| `@GetMapping`     | 方法          | 限定 HTTP GET 请求，REST 查询资源                            |
+| `@PostMapping`    | 方法          | 限定 HTTP POST 请求，REST 新增资源                           |
+| `@PutMapping`     | 方法          | 限定 HTTP PUT 请求，REST 全量修改资源                        |
+| `@DeleteMapping`  | 方法          | 限定 HTTP DELETE 请求，REST 删除资源                         |
+| `@PathVariable`   | 方法参数      | 获取 URL 路径变量，如`/api/users/{id}`中的 id                |
+| `@RequestBody`    | 方法参数      | 将前端提交的 JSON，用 Jackson 反序列化为 Java 对象（入参）   |
+
+### spring 容器注解
+
+| 注解                    | 作用位置     | 含义                                                    |
+| ----------------------- | ------------ | ------------------------------------------------------- |
+| `@Configuration`        | 配置类       | 标记当前类是 Spring 配置类，用来注册 Bean               |
+| `@Bean`                 | 配置类方法上 | 将方法返回对象交给 Spring 容器管理，注入 IOC            |
+| `@RestControllerAdvice` | 全局异常类   | 全局统一拦截所有 Controller 抛出的异常，统一返回 Result |
+| `@ExceptionHandler`     | 异常处理方法 | 指定捕获某一类异常，自定义返回信息                      |
+
+### Lombok注解
+
+| 注解                  | 作用位置 | 含义                                                |
+| --------------------- | -------- | --------------------------------------------------- |
+| `@Data`               | 实体类   | 自动生成 getter、setter、toString、equals、hashCode |
+| `@NoArgsConstructor`  | 实体类   | 无参构造函数                                        |
+| `@AllArgsConstructor` | 实体类   | 全参构造函数                                        |
+
+> 说明：MyBatis-Plus**没有专门在 service 层新增注解**，MP 核心注解大多在 Entity 实体；Service 层是 Spring 注解 + MP 提供的`ServiceImpl`父类（不是注解！），下面整理项目开发里配套使用的全部注解。
+
+### Service 层 Spring 注解（业务实现类）
+
+| 注解                                            | 作用                                                         | 使用位置              |
+| ----------------------------------------------- | ------------------------------------------------------------ | --------------------- |
+| `@Service`                                      | 标记当前类为 Spring 业务层 Bean，交给 IOC 容器管理           | Service 实现类        |
+| `@Transactional(rollbackFor = Exception.class)` | 事务注解；抛出异常自动回滚，**推荐写在 Service 方法 / 类上** | Service 类 / 业务方法 |
+| `@Autowired`                                    | 依赖注入，注入 Mapper 或者其他 Service（Spring）             | 成员变量 / 构造器     |
+| `@Resource`                                     | JSR 标准注入注解，按名称注入，替代 @Autowired                | 成员变量              |
+
+### MyBatis-Plus 实体 Entity 注解
+
+（和 Service 配套使用，开发高频）
+
+| 注解                              | 作用                                                         |
+| --------------------------------- | ------------------------------------------------------------ |
+| `@TableName("t_user")`            | 实体类映射数据库表名                                         |
+| `@TableId(type=IdType.ASSIGN_ID)` | 标记主键，ASSIGN_ID 雪花算法生成 Long 主键；AUTO 自增        |
+| `@TableField`                     | 字段映射。常用属性：`value`数据库字段名`exist=false`：实体字段不是数据库列`fill=FieldFill.INSERT`插入自动填充`fill=FieldFill.INSERT_UPDATE`插入更新自动填充`select=false`查询不返回此字段 |
+| `@TableLogic`                     | 逻辑删除注解，deleteById 变成 update 更新 deleted 标记，不是物理删除 |
+| `@Version`                        | 乐观锁版本号注解，用于并发更新控制                           |
+| `@EnumValue`                      | 枚举映射数据库字段，保存枚举值到数据库                       |
+| `@KeySequence`                    | Oracle 序列主键专用                                          |
+| `@InterceptorIgnore`              | 忽略 MP 拦截器（比如忽略多租户、逻辑删除）                   |
+
+### Mapper 层 MP 相关注解
+
+| 注解                            | 作用                                                         |
+| ------------------------------- | ------------------------------------------------------------ |
+| `@Mapper`                       | 标记 Mapper 接口，交给 Mybatis 扫描                          |
+| `@MapperScan("com.xxx.mapper")` | 启动类注解，批量扫描所有 Mapper 接口，替代每个 Mapper 写`@Mapper` |
+
+### 综合示例
+
 ## DO/DTO/VO/BO/POJO
 
 核心原则：**分层隔离，不同层用不同对象，不要一个实体走完全程**
