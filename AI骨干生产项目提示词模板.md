@@ -1,5 +1,56 @@
 # AI 生成生产级项目 · 固定提示词模板
 
+```
+请生成一个生产级SpringBoot4.1.x项目模板，严格遵循RESTful接口规范，技术栈：
+JDK21 LTS，SpringBoot4.1.x，Lombok，Logback，SpringAI 1.x，Maven。
+ Druid2.x数据源
+## 核心要求
+1. 项目结构：标准分层架构 controller / service / mapper / entity / config / exception / util
+2. RESTful风格：统一返回结果封装，全局异常处理器，统一HTTP状态码，接口路径使用名词复数，GET查询、POST新增、PUT更新、DELETE删除
+3. Logback日志配置（重点）
+   - 日志按日志级别拆分4个独立文件：debug.log、info.log、warn.log、error.log
+   - 不同级别日志互不交叉：debug只输出debug，info只输出info，warn只输出warn，error只输出error
+   - 日志滚动策略：按文件大小滚动 + 按日期归档，保留历史日志，自动压缩旧日志
+   - 全局开启API访问日志：记录每个接口请求URL、请求方法、请求参数、响应耗时、响应状态码，使用AOP实现接口日志切面
+   - 控制台保留彩色日志输出；生产环境可关闭控制台输出
+4. SpringAI 1.x集成：配置OpenAI兼容API，封装AI服务层，提供AI对话REST接口，支持传入prompt返回结果
+5. Lombok：实体类使用@Data、@NoArgsConstructor、@AllArgsConstructor，禁止手写get/set
+6. 公共组件：
+   - 全局统一返回对象 Result<T>，包含code、msg、data、timestamp
+   - 全局异常处理器 GlobalExceptionHandler，捕获业务异常、系统异常，返回统一JSON
+   - 自定义业务异常 BusinessException
+   - WebMvc配置类 WebConfig
+7. Maven pom.xml：所有依赖版本匹配SpringBoot4.1.x，SpringAI 1.x，Lombok，logback使用spring-boot自带starter，排除多余日志依赖
+8. 配置文件：application.yml，区分开发/生产环境application-dev.yml、application-prod.yml，生产环境调整日志级别
+9. 代码注释：类、核心方法添加JavaDoc注释；所有配置项写中文注释说明用途
+
+## 输出要求
+1. 输出完整目录结构 tree
+2. 输出完整 pom.xml
+3. 输出完整 logback-spring.xml 日志配置文件
+4. 依次输出各个Java类代码：统一返回、全局异常、AOP接口日志切面、SpringAI服务、Controller示例、实体类、配置类
+5. 输出yml配置文件
+6. 最后补充启动说明和日志文件说明
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 > **用法**：复制全文 → 只填【定稿区】6个空位 → 发给 AI。
 > **设计原则**：固定的叫「基线」（链路+工程规范/Web通用/数据/缓存/性能/安全/日志/环境/CI-CD，每个项目不变）；可变的叫「业务」（栈/功能/表/接口，每次填空）。
 

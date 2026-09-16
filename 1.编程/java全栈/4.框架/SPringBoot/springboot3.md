@@ -42,7 +42,7 @@
 
 2. **项目创建**（官网 / IDEA / CLI）掌握环境搭建，手动搭建：Maven/Gradle 创建工程
 
-3. **理解** 自动装配、内置服务器、一键依赖管理    理解自动配置原理  
+3. **理解** 自动装配、内置服务器、一键依赖管理    理解自动配置原理  定制化组件
 
 4. **配置文件体系**.yml/application.properties，多环境配置、配置优先级、自定义配置参数读取，配置绑定
 
@@ -122,6 +122,8 @@
 # springboot
 
 > Spring Boot 是基于 Spring 框架的快速开发脚手架，用来简化 Java 后端开发，自动配置、开箱即用，快速搭建 Web / 接口服务。
+
+简化开发，简化配置，简化整合，简化部署，简化监控，简化运维。
 
 **特性**
 
@@ -570,45 +572,292 @@ public class HelloController {
 
 # 基础内容
 
-## @SpringBootApplication
+## starter 
+
+**Starter = 一套预整合好的依赖包 + 自动配置类，你只需要引入这一个依赖，不用自己手动凑一堆 jar、写大量配置。**
+
+> 底层就是 Maven 的 dependency 聚合，配合 `spring-boot-autoconfigure` 自动装配机制。
+>
+> Starter 是依赖聚合，解决**导包麻烦**；自动配置类解决**创建 Bean 麻烦**，两者组成 SpringBoot 的核心特性：**自动装配**。
+
+### Starter种类
+
+1. 官方 starter
+
+   ```
+   spring-boot-starter-xxx
+   ```
+
+   （Spring 官方提供）
+
+   - `spring-boot-starter-web`：web 场景，tomcat+springmvc+json
+   - `spring-boot-starter-flyway`：数据库迁移场景
+   - `spring-boot-starter-test`：单元测试
+
+2. 第三方 starter
+
+   ```
+   xxx-spring-boot-starter
+   ```
+
+   （第三方框架自己封装）
+
+   - `mybatis-plus-spring-boot4-starter`
+   - `knife4j-openapi3-jakarta-spring-boot-starter`
+
+### Starter 能干什么
+
+1. **自动引入相关依赖**
+
+> 例：引入 `spring-boot-starter-flyway`，自动带入 flyway-core、flyway-jdbc 等，不用一个个手写。
+
+1. **自动配置（AutoConfiguration）**
+
+> classpath 存在对应 jar 包时，SpringBoot 自动加载预写好的配置类，Bean 自动注入； 你只需要在 yml 写少量业务配置，不用手动 new 对象、注册 Bean。
+
+### 使用 starter
+
+只写一行：
 
 ```
-@Configuration
-@EnableAutoConfiguration
-@ComponentScan
-public @interface SpringBootApplication {}
-
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-flyway</artifactId>
+</dependency>
 ```
 
-1. **@Configuration** 标记当前类是配置类，允许在类内部使用 `@Bean` 注册 Bean 到 Spring 容器。
-2. **@EnableAutoConfiguration** 开启 SpringBoot 自动装配；根据项目依赖，自动创建 Bean。
+> 自动导入依赖，自动创建 Flyway 实例，读取 `spring.flyway` 配置。
 
-> 底层读取 `META‑INF/spring/org.springframework.boot.autoconfigure.imports` 文件，导入大量自动配置类。
+### Starter 和自动配置 WebMvcAutoConfiguration 的关系
 
-3. **@ComponentScan** 组件扫描，扫描 `@Component/@Service/@Repository/@Controller`，把类交给 Spring 管理
+- Starter：**负责把 jar 包导入项目**（Maven 层面）
+- AutoConfiguration（WebMvcAutoConfiguration）：**负责在代码层面自动创建 Bean**（Spring 容器层面） 两者配合工作。
 
-## 包扫描规则
+## 自动配置
 
-> **默认规则：扫描【启动类所在包及其所有子包】**
+### 依赖管理机制
 
-示例： 启动类全类名：`com.demo.SpringbootDemoApplication`
+1、为什么导⼊starter-web 所有相关依赖都导⼊进来？开发什么场景，导⼊什么场景启动器。
+ maven依赖传递原则。A-B-C： A就拥有B和C
+导⼊ 场景启动器。 场景启动器 ⾃动把这个场景的所有核⼼依赖全部导⼊进来
+  2、为什么版本号都不⽤写？
+每个boot项⽬都有⼀个⽗项⽬spring-boot-starter-parent  parent的⽗项⽬是
+spring-boot-dependencies  ⽗项⽬ 版本仲裁中⼼，把所有常⻅的jar的依赖版本都声明好了。
+  3、⾃定义版本号
+利⽤maven的就近原则，直接在当前项⽬ properties 中修改标签中声明⽗项⽬⽤的版本属性的key，直接在导⼊依赖的时候声明版本
 
-- ✅会扫描：`com.demo`、`com.demo.controller`、`com.demo.service`
-- ❌**不会扫描**：`com.other`（不在启动类同级 / 子包，不会被扫描，Bean 不生效）
+<version>版本号</version>
 
-解决方案：指定扫描包
-
-方式 1：`@SpringBootApplication(scanBasePackages = "com")`
+4、第三⽅的jar包， boot⽗项⽬没有管理的需要⾃⾏声明好
 
 ```
-@SpringBootApplication(scanBasePackages = {"com.demo","com.other"})
-public class SpringbootDemoApplication {
+<!-- https://mvnrepository.com/artifact/com.alibaba/druid -->
+ <dependency>
+ <groupId>com.alibaba</groupId>
+ <artifactId>druid</artifactId>
+ <version>1.2.16</version>
+ </dependency>
+```
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/image-20250601213915956.png)
+
+### 自动配置
+
+您需要通过在其中一个 [`@Configuration`](https://docs.springframework.org.cn/spring-framework/docs/7.0.x/javadoc-api/org/springframework/context/annotation/Configuration.html) 类上添加 [`@EnableAutoConfiguration`](https://docs.springframework.org.cn/spring-boot/4.0.0/api/java/org/springframework/boot/autoconfigure/EnableAutoConfiguration.html) 或 [`@SpringBootApplication`](https://docs.springframework.org.cn/spring-boot/4.0.0/api/java/org/springframework/boot/autoconfigure/SpringBootApplication.html) 注解来选择启用自动配置。
+
+|      | 您应该只添加一个 [`@SpringBootApplication`](https://docs.springframework.org.cn/spring-boot/4.0.0/api/java/org/springframework/boot/autoconfigure/SpringBootApplication.html) 或 [`@EnableAutoConfiguration`](https://docs.springframework.org.cn/spring-boot/4.0.0/api/java/org/springframework/boot/autoconfigure/EnableAutoConfiguration.html) 注解。我们通常建议您只将其中一个添加到您的主 [`@Configuration`](https://docs.springframework.org.cn/spring-framework/docs/7.0.x/javadoc-api/org/springframework/context/annotation/Configuration.html) 类中。 |
+| ---- | ------------------------------------------------------------ |
+|      |                                                              |
+
+禁用自动配置 您可以使用 [`@SpringBootApplication`](https://docs.springframework.org.cn/spring-boot/4.0.0/api/java/org/springframework/boot/autoconfigure/SpringBootApplication.html) 的 exclude 属性来禁用它们，如以下示例所示
+
+```
+@SpringBootApplication(exclude = { DataSourceAutoConfiguration.class })
+public class MyApplication {
+
 }
 ```
 
-方式 2：单独写 `@ComponentScan(basePackages = "com")`
 
-> 坑：启动类放错包，导致 Controller、Service 不生效，访问 404。
+
+#### 自动配置
+
+⾃动配置的 Tomcat、SpringMVC 等
+
+- 导⼊场景，容器中就会⾃动配置好这个场景的核⼼组件。
+- 以前：DispatcherServlet、ViewResolver、CharacterEncodingFilter....
+- 现在：⾃动配置好的这些组件
+- 验证：容器中有了什么组件，就具有什么功能
+
+```
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+// 随机端口不影响主程序运行
+@Test
+    void test() {
+
+// 1. 获取容器中所有Bean定义名称和总数
+        String[] names = applicationContext.getBeanDefinitionNames();
+        System.out.println("=======================所有Bean开始=======================");
+        for (String name : names) {
+            System.out.println(name);
+        }
+        System.out.println("=======================所有Bean结束，总数=" + names.length + "=======================");
+    }
+
+```
+
+**默认的包扫描规则**
+
+ @SpringBootApplication  标注的类就是主程序类 SpringBoot只会扫描主程序所在的包及其下⾯的⼦包，
+
+⾃动的component-scan功能 ⾃定义扫描路径
+
+@SpringBootApplication(scanBasePackages = "com.zxy")
+
+@ComponentScan("com.zxy")  直接指定扫描的路径
+
+**配置默认值** 
+
+配置⽂件的所有配置项是和某个类的对象值进⾏⼀⼀绑定的。 绑定了配置⽂件中每⼀项值的类： 属性类。 ⽐如： ServerProperties  绑定了所有Tomcat服务器有关的配置 MultipartProperties  绑定了所有⽂件上传相关的配置 ....参照官⽅⽂档：或者参照 绑定的  属性类。
+
+ **按需加载⾃动配置** 
+
+导⼊场景 spring-boot-starter-web  场景启动器除了会导⼊相关功能依赖，导⼊⼀个 starter  的 spring-boot-starter  ，是所有  starter的tarter  基础核⼼starte
+
+**总结： 导⼊场景启动器、触发  spring-boot-autoconfigure  这个包的⾃动配置⽣效、容器 中就会具有相关场景的功能**
+
+spring-boot-starter  导⼊了⼀个包  都是各种场景的 spring-boot-autoconfigure  。包⾥AutoConfiguration  ⾃动配置类 虽然全场景的⾃动配置都在  spring-boot-autoconfigure  这个包，但是不是全都 开启的。  导⼊哪个场景就开启哪个⾃动配置
+
+#### **启动流程**
+
+![image-20250601215235588](C:\Users\DELL\AppData\Roaming\Typora\typora-user-images\image-20250601215235588.png)
+
+**1、导⼊ starter-web  ：导⼊了web开发场景**
+
+1、场景启动器导⼊了相关场景的所有依赖： starter-json  、 starter-tomcat  、 sp ringmvc  
+
+2、每个场景启动器都引⼊了⼀个 spring-boot-starter  ，核⼼场景启动器。
+
+ 3、核⼼场景启动器引⼊了 spring-boot-autoconfigure  包。
+
+ 4、 spring-boot-autoconfigure  ⾥⾯囊括了所有场景的所有配置。
+
+ 5、只要这个包下的所有类都能⽣效，那么相当于SpringBoot官⽅写好的整合功能就⽣效了。
+
+ 6、SpringBoot默认却扫描不到  spring-boot-autoconfigure  下写好的所有配置类。 （这些配置类给我们做了整合操作），默认只扫描主程序所在的包。
+
+**2、主程序： @SpringBootApplication**
+
+1、 @SpringBootApplication  由三个注解组成 @SpringBootConfiguration  、 @E nableAutoConfiguratio  、 @ComponentScan 
+
+ 2、SpringBoot默认只能扫描⾃⼰主程序所在的包及其下⾯的⼦包，扫描不到  spring-boo t-autoconfigure  包中官⽅写好的配置类 
+
+3、 @EnableAutoConfiguration  ：SpringBoot 开启⾃动配置的核⼼。 
+
+1. 是由 @Import(AutoConfigurationImportSelector.class)  提供功能：批量 给容器中导⼊组件。 
+
+2. SpringBoot启动会默认加载 142个配置类。 
+
+3. 这142个配置类来⾃于 spring-boot-autoconfigure  下  META-INF/spring/o rg.springframework.boot.autoconfigure.AutoConfiguration.import s  ⽂件指定的 项⽬启动的时候利⽤ @Import 批量导⼊组件机制把  autoconfigure  包下的142  xx xxAutoConfiguration  类导⼊进来（⾃动配置类） 虽然导⼊了 142  个⾃动配置类 
+
+4、按需⽣效： 并不是这 142  个⾃动配置类都能⽣效 每⼀个⾃动配置类，都有条件注解 @ConditionalOnxxx  ，只有条件成⽴，才能⽣效
+
+**3、 xxxxAutoConfiguration  ⾃动配置类**
+
+1、给容器中使⽤@Bean 放⼀堆组件。
+
+ 2、每个⾃动配置类都可能有这个注解 @EnableConfigurationProperties(ServerPr operties.class)  ，⽤来把配置⽂件中配的指定前缀的属性值封装到  xxxPropertie属性类中 
+
+3、以Tomcat为例：把服务器的所有配置都是以  server  开头的。配置都封装到了属性类中
+
+4、给容器中放的所有组件的⼀些核⼼参数，都来⾃于 xxxProperties ，xxxProperties 都是和配置⽂件绑定。
+
+  只需要改配置⽂件的值，核⼼组件的底层参数都能修改
+
+#### **核⼼流程总结：**
+
+ 1、导⼊ starter 就会导⼊autoconfigure  包
+
+2 autoconfigure  包⾥⾯ 有⼀个⽂件   META-INF/spring/org.springframework.bo ot.autoconfigure.AutoConfiguration.imports  ,⾥⾯指定的所有启动要加载的⾃动配 置类 
+
+3、@EnableAutoConfiguration 会⾃动的把上⾯⽂件⾥⾯写的所有⾃动配置类都导⼊进来xxxAutoConfiguration 是有条件注解进⾏按需加载
+
+4、 xxxAutoConfiguration  给容器中导⼊⼀堆组件，组件都是从  xxxProperties  中提取 属性值 
+
+5、 xxxProperties  ⼜是和配置⽂件进⾏了绑定
+
+导⼊ starter  、修改配置⽂件，就能修改底层⾏为。
+
+### SpringApplication
+
+#### ⾃定义 banner
+
+**方式 1：组件注解（@Component / @Service / @Repository / @Controller）**
+
+> 前提：**该类在启动类的扫描包范围之内**（默认扫描启动类所在包以及子包）
+
+```
+@Component
+public class MyDemoBean {
+    public void hello(){
+        System.out.println("my demo bean hello");
+    }
+}
+```
+
+> @Service、@Repository、@Controller 本质就是`@Component`衍生注解，只是语义区分。
+
+**方式 2：@Bean + @Configuration（配置类方式，最常用第三方类注册 Bean）**
+
+适合：**你没有源码，不能加 @Component 注解（例如 DruidDataSource，第三方类）**
+
+```
+@Configuration
+public class MyConfig {
+    @Bean
+    public DruidDataSource dataSource(){
+        DruidDataSource ds = new DruidDataSource();
+        ds.setUrl("jdbc:mysql://127.0.0.1:3306/test_db");
+        ds.setMaxActive(20);
+        return ds;
+    }
+}
+```
+
+> 💡要点：@Bean 方法返回对象直接注册到 IOC；Bean 名称默认是方法名；也可以`@Bean(name = "myDs")`指定名字。
+
+**方式 3：@Import 导入类（导入普通类、配置类、ImportSelector、ImportBeanDefinitionRegistrar）**
+
+```
+//直接导入普通类，不需要@Component也会注册bean
+@Import({MyOtherBean.class})
+@SpringBootApplication
+public class DemoApp {
+}
+```
+
+高级：`ImportSelector` 返回类名数组，批量导入 Bean；`ImportBeanDefinitionRegistrar`手动注册 BeanDefinition（底层，MyBatis‑MapperScan 底层就是这个）。
+
+**方式 4：BeanDefinitionRegistry 手动注册（API 底层方式）**
+
+一般写在 `ApplicationContextInitializer` 里面，直接操作 BeanDefinition 注册元数据。
+
+> 很少业务开发使用；框架开发用。
+
+✅小结 4 种注册 bean：
+
+1. `@Component`及其衍生：自己写的业务类；
+2. `@Bean + @Configuration`：注册第三方组件；
+3. `@Import`：导入外部配置；
+4. `BeanDefinitionRegistrar`底层 API 注册 BeanDefinition。
+
+#### ⾃定义 SpringApplication
+
+SpringApplication.run 是整套启动流程；我们可以在启动各个阶段插入自定义逻辑。 三个核心扩展点：
+
+1. `ApplicationContextInitializer` 容器初始化器（容器实例之后，refresh 刷新**之前**执行）
+2. `ApplicationListener`  **事件监听器**，监听 SpringBoot 启动生命周期事件
+3. 自定义 SpringApplication / SpringApplicationBuilder (FluentBuilder) 修改启动行为
 
 ## SpringBoot 启动步骤（面试版）
 
@@ -981,7 +1230,7 @@ data class ChatConfig(
 5. 空值：写 `password:` 后面留空，不要写 `password: null`
 6. yml 中`off / on、yes / no`会自动转布尔，字符串 "yes" 要加引号 `"yes"`
 
-##  Profile 多环境切换
+##  Profiles 多环境切换
 
 > **Profile 作用：一套代码，不同环境加载不同配置** 开发环境：本地调试、开启 h2 控制台、关闭 thymeleaf 缓存、日志打全； 生产环境：连接真实数据库、关闭调试功能、关闭控制台、日志精简。
 
@@ -1309,9 +1558,9 @@ fun loadMyYaml(): YamlPropertiesFactoryBean {
 }
 ```
 
-##  @Configuration
+## 外部化配置
 
-自定义配置类 @Configuration
+## 单元测试
 
 ## 日志
 
@@ -1666,6 +1915,8 @@ target/xxx.war
 ## springMVC
 
 > 一句话前置：SpringBoot 引入`spring-boot-starter-web`自动集成 SpringMVC，无需手动配置 DispatcherServlet；RESTful 是接口设计规范，用 HTTP 动词表达资源操作，URL 只代表资源名词，不包含动词
+>
+> Servlet 是 JavaWeb 的底层规范，运行在 Tomcat 这类 Servlet 容器中；核心作用是接收 HTTP 请求、处理业务、返回响应。配套 Filter 可以拦截请求实现登录校验。SpringMVC 底层就是 DispatcherServlet，封装了原生 Servlet，不用开发者手写多个 Servlet。在图书借阅系统中，原生 Servlet 可以实现登录、图书查询、借阅归还等接口，Filter 统一拦截做登录鉴权。
 
 ### RESTful 规范核心（接口约定）
 
@@ -2483,6 +2734,8 @@ public class RestDemoApplication {
 
 ![image-20260914223428532](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20260914223428532.png)
 
+H2数据库持久化
+
 ### 架构图
 
 ![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/mermaid (4).png)
@@ -2552,6 +2805,8 @@ logback-spring.xml
 ```
 
 ![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/mermaid (7).png)
+
+## knfi4j接口文档调试
 
 ## 注解
 
@@ -2633,9 +2888,17 @@ logback-spring.xml
 
 ## DO/DTO/VO/BO/POJO
 
-核心原则：**分层隔离，不同层用不同对象，不要一个实体走完全程**
-
-
+> 适用：Java 后端（SpringBoot/MyBatis/MyBatis-Plus）领域对象分层，**核心目的：解耦，隔离不同层的数据模型，避免一个实体类贯穿所有代码**。
+>
+> POJO：纯净普通 Java 对象（基础概念，不是分层模型）
+>
+> DO：数据库表映射对象（持久层）
+>
+> BO：业务对象（业务层，封装业务逻辑相关数据）
+>
+> DTO：数据传输对象（接口入参 / 跨服务调用）
+>
+> VO：视图对象（接口返回给前端）
 
 | 缩写     | 中文名称       | 存放位置          | 核心作用                                                     | 你的 OJ 例子                                                 |
 | -------- | -------------- | ----------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
@@ -2645,7 +2908,7 @@ logback-spring.xml
 | **VO**   | 视图对象       | `com.exam.vo`     | **返回给前端页面展示**，按需组装字段，过滤敏感信息           | `ExamRankingVO`、`AuthLoginVO`（登录返回给前端）             |
 | **BO**   | 业务对象       | `com.exam.bo`     | **Service 层内部使用**，封装复杂业务组合数据，由多个 DO 组装而成，不对外暴露 | 比如考试统计 BO，组合 ExamRecord、Paper 多个 DO 的数据，仅在 Service 内部流转 |
 
-**完整数据流**
+### **完整数据流**
 
 ```
 前端JSON → LoginDTO（入参DTO） → Controller
@@ -2660,80 +2923,163 @@ DO → 转为 AuthLoginVO（VO） → Controller
 
 ```
 
-**重点**
+### 基础概念 POJO
+
+**普通老式 Java 对象**，是统称，不是分层里的某一层。
+
+**特征**
+
+1. 只有属性、getter/setter、构造器、toString；
+2. 不继承任何特定类，不实现特定接口；
+3. 没有业务方法，纯数据载体；
+
+> DO、DTO、VO、BO **都属于 POJO**，只是在不同层使用，职责不同。
+>
+> ❌ 误区：POJO ≠ 数据库实体。POJO 是大类。
+
+示例极简 POJO
+
+```
+public class UserPOJO {
+    private Long id;
+    private String username;
+    // getter setter
+}
+```
+
+------
+
+### DO（Data Object，数据对象）
+
+> 别名：PO（Persistent Object，持久化对象），MyBatis-Plus 里常叫 Entity。
+
+**直接映射数据库表结构，和表字段一一对应，放在 mapper /entity 包**。
+
+- 字段 = 数据库列；
+- 包含数据库字段：主键、创建时间、更新时间、逻辑删除、租户 ID 等；
+- **禁止传给前端**，不要直接返回 DO 给 Controller；
+- 只能在 `Mapper <-> Service` 之间流转。
+
+包路径示例：`com.xxx.entity.UserDO`
+
+```
+// UserDO 数据库映射实体
+@TableName("t_user")
+public class UserDO {
+    private Long id;
+    private String username;
+    private String password; // 数据库存密码，绝对不能返回前端！
+    private LocalDateTime createTime;
+    private Integer deleted; // 逻辑删除标记
+    // getter setter
+}
+```
+
+✅ 优点：表结构变更只改 DO；
+
+❌ 风险：DO 包含敏感字段（密码），如果直接返回前端会泄露。
+
+------
+
+### BO（Business Object，业务对象）
+
+> 放在 service 层，**封装业务所需的完整业务数据**。
+
+Service 层内部使用，聚合多个 DO 的数据，组装业务实体。
+
+- 场景：一个业务需要多张表的数据（用户表 + 角色表 + 部门表），不直接传多个 DO，组装成 BO；
+- 包含业务相关字段，**可附带少量业务标识字段**；
+- BO 只在 Service 内部流转，**不接收前端参数，不返回前端**；
+
+> 小项目经常省略 BO，直接 DO 在 Service 用；复杂业务、多表聚合才需要 BO。
+
+包路径示例：`com.xxx.service.bo.UserBO`
+
+```
+// 用户业务对象，聚合用户+部门信息
+public class UserBO {
+    private Long userId;
+    private String username;
+    private String deptName; // 来自部门表DO，不是user表字段
+    private List<String> roleList; // 用户角色集合
+}
+```
+
+流转链路：`Mapper查多个DO → Service组装成BO → Service业务处理`
+
+------
+
+### DTO
+
+> **接收前端请求参数，或者微服务之间远程调用传输数据**。
+>
+> 包路径：`com.xxx.dto.UserSaveDTO`、`UserQueryDTO`
+
+Controller 接收前端`POST/GET`入参。
+
+- 字段是前端提交的参数，**不需要和数据库字段一致**；
+- 可以加校验注解 `@NotBlank @Size`；
+- 只负责接收请求，**不包含数据库字段（createTime/deleted 等）**；
+- 命名习惯：新增`UserSaveDTO`、查询`UserQueryDTO`。
+
+```
+// 用户新增 DTO，前端传参
+public class UserSaveDTO {
+    @NotBlank(message = "用户名不能为空")
+    private String username;
+    @NotBlank(message = "密码不能为空")
+    private String password;
+    private Long deptId;
+    // getter setter
+}
+```
+
+> 微服务场景：服务 A 调用服务 B，传递的参数对象也叫 DTO。
+
+流转：`前端 → Controller(DTO) → DTO转BO/DO → Service`
+
+------
+
+### VO
+
+> 返回给前端的响应对象，放在 `com.xxx.vo.UserVO`
+
+Controller 返回给前端页面的数据模型。
+
+- 按需返回字段，**过滤敏感字段（密码、密钥）**；
+- 字段命名可以适配前端（甚至可以写驼峰 / 下划线，配合序列化）；
+- 可以组装格式化数据：日期格式化、字典文本（status=1 → "启用"）；
+- 不包含数据库底层字段（deleted）。
+
+```
+// 返回前端用户VO
+public class UserVO {
+    private Long id;
+    private String username;
+    private String deptName;
+    private String statusText; // 格式化后的状态文本
+    // ❌ 没有password！
+}
+```
+
+流转：`Service(BO/DO) → 转换为VO → Controller返回给前端`
+
+### 架构图
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/mermaid.png)
+
+### **重点**
 
 1. **DO 严禁直接返回前端** DO 里面有 password、secret 等敏感字段，直接返回会泄露。要转成 VO 再返回。
-
-> 你代码里：`user.setPassword(null);` 就是临时补救，规范做法是转 VO。
 
 2. **DTO 和 VO 区别**
 
 - DTO：**接收前端传进来的数据（入参）**
 - VO：**后端输出、给前端展示（出参）**
 
-> 小项目为省事，有人合并，但是大型项目分开。
-
 3. **BO 什么时候才用？** 简单业务（邮箱登录）**不需要 BO**。 只有业务需要**把多张表的 DO 合并成一个业务对象**，才用 BO。 例如：统计一场考试，同时拿考生记录、试卷信息、题目信息，在 Service 内部组装成 ExamStatBO。
 
 4. **POJO 是统称！** 不是和 DO/DTO 并列。DO、DTO、VO、BO**全部属于 POJO**。只要普通 JavaBean，不是框架类、不是接口，就是 POJO。
-
-pringBoot 的Web开发能⼒，由SpringMVC提供。
-
-## WebMvcAutoConfiguration原理
-
-### 生效条件
-
-### 效果
-
-###  WebMvcConfigurer接⼝
-
-### 静态态资源规则源码
-
-```
- 1. 
-规则⼀：访问： 
-s/ 
-下找资源.
- /webjars/** 
-路径就去 
-a. 
-maven 导⼊依赖
-b.
- 2. 
-规则⼆：访问： 
-classpath:/META-INF/resources/webjar /** 
-路径就去 
-静态资源默认的四个位置找资源
- 
-a. classpath:/META-INF/resources/ 
-b. classpath:/resources/ 
-c. classpath:/static/ 
-d. classpath:/public/ 
-3. 
-规则三：静态资源默认都有缓存规则的设置
-a. 
-所有缓存的设置，直接通过配置⽂件： 
-spring.web 
-b. 
-cachePeriod： 缓存周期； 多久不⽤找服务器要新的。 默认没有，以s为单位
-c. 
-cacheControl： HTTP缓存控制；https://developer.mozilla.org/zh
-CN/docs/Web/HTTP/Caching
- d. 
-useLastModified：是否使⽤最后⼀次修改。配合HTTP Cache规则
-```
-
-###  EnableWebMvcConfiguration
-
-### **为什么容器中放⼀个 WebMvcConfigurer  就能配置底层⾏为**
-
-1. WebMvcAutoConfiguration 是⼀个⾃动配置类，它⾥⾯有⼀个  EnableWebMvcConfiguration 
-2. EnableWebMvcConfiguration 继承与 DelegatingWebMvcConfiguration ，这两个都⽣效
-3. DelegatingWebMvcConfiguration 利⽤ DI 把容器中所有WebMvcConfigurer  注⼊进来
-4. 别⼈调⽤ ` DelegatingWebMvcConfiguration ` 的⽅法配置底层规则，⽽它调⽤所有 
-   WebMvcConfigurer 的配置底层⽅法。
-
-###  **WebMvcConfigurationSupport**
 
 ## Web场景
 
@@ -2773,13 +3119,14 @@ useLastModified：是否使⽤最后⼀次修改。配合HTTP Cache规则
 默认配置
 
 1. 包含了  ContentNegotiatingViewResolver 和  BeanNameViewResolver 组件，⽅便视图解析
-
 2. 默认的静态资源处理机制： 静态资源放在  static ⽂件夹下即可直接访问
 3. ⾃动注册了  Converter, GenericConverter, 需求 
 4. ⽀持  Formatter组件，适配常⻅数据类型转换和格式化 HttpMessageConverters，可以⽅便返回 json等数据类型
 5. 注册  MessageCodesResolver，⽅便国际化及错误消息处理
 6. ⽀持 静态  index.html 
 7. ⾃动使⽤ ConfigurableWebBindingInitializer，实现 验等功能
+
+### 自定义web场景
 
 ## 静态资源
 
@@ -2860,7 +3207,11 @@ spring.web
 
 ## 路径匹配
 
-以前只⽀持 AntPathMatcher 策略, 现在提供了 PathPatternParser 策略。并且可以让我们指定 到底使⽤那种策略。
+**路径匹配：就是 SpringMVC 判断「请求 URL」和你写的「匹配规则（pattern）」是否对上，决定拦截器 / 路由要不要处理这个请求。**
+
+> 用到的地方：`@RequestMapping`、拦截器 `addPathPatterns / excludePathPatterns`、Sa-Token 白名单、Filter urlPatterns。
+>
+> SpringBoot2 默认：`AntPathMatcher`（Ant 风格）；SpringBoot3 可选 `PathPatternParser`（新路径匹配器）
 
 **ant 语法规则**
 
@@ -3032,70 +3383,7 @@ messageConverter
 
 
 
-## 模板引擎
 
-由于 SpringBoot 使⽤了嵌⼊式 Servlet 容器。所以 JSP 默认是不能使⽤的。 
-
-如果需要服务端⻚⾯渲染，优先考虑使⽤  模板引擎
-
-![image-20260610124356464](C:\Users\DELL\AppData\Roaming\Typora\typora-user-images\image-20260610124356464.png)
-
-
-
-模板引擎⻚⾯默认放在  src/main/resources/templates
-
-springboot模板引擎自动配置
-
-**FreeMarker** 
-
-**Groovy** 
-
-**Thymeleaf**
-
- **Mustache** 
-
-Thymeleaf官⽹：https://www.thymeleaf.org/ 
-
-### Thymeleaf整合
-
-**1导入依赖**
-
-```
-<dependency>
- <groupId>org.springframework.boot</groupId>
- <artifactId>spring-boot-starter-thymeleaf</artifactId>
- </dependency>
-```
-
-**2⾃动配置原理** 
-
-1.  开启了org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration  ⾃动配置
-
-2.  属性绑定在  ThymeleafProperties 中，对应配置⽂件  spring.thymeleaf 内容 3.  所
-3.  有的模板⻚⾯默认在  classpath:/templates  ⽂件夹下 
-4.  默认效果 a.  所有的模板⻚⾯在  classpath:/templates/  下⾯找 b.  找后缀名为 .html  的⻚⾯
-
-## 基础语法
-
-1 核心用法
-
-2 语法实例
-
-3 属性设置
-
-4 遍历 
-
-5 判断
-
-6 属性优先级
-
-7 行内写法
-
-8 变量选择
-
-9 模板布局
-
-10 devtools
 
 ## 国际化
 
@@ -3115,7 +3403,7 @@ Thymeleaf官⽹：https://www.thymeleaf.org/
 
 4. 在⻚⾯中可以使⽤表达式  #{}  获取国际化的配置项值
 
-## 错误机制
+## 全局异常处理
 
 ### 1 默认机制
 
@@ -3124,9 +3412,7 @@ Thymeleaf官⽹：https://www.thymeleaf.org/
 1. SpringBoot 会⾃适应处理错误，响应⻚⾯或JSON数据
 2. SpringMVC的错误处理机制依然保留，MVC处理不了，才会交给boot进⾏处理
 
-
-
-![image-20260610125308462](C:\Users\DELL\AppData\Roaming\Typora\typora-user-images\image-20260610125308462.png)
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/image-20260610125308462.png)
 
 
 
@@ -3162,7 +3448,7 @@ Thymeleaf官⽹：https://www.thymeleaf.org/
 跟据boot的错误⻚⾯规则，⾃定义⻚⾯模板
 ```
 
-3 最佳实战
+### 3 最佳实战
 
 ![image-20260610125844284](C:\Users\DELL\AppData\Roaming\Typora\typora-user-images\image-20260610125844284.png)
 
@@ -3242,23 +3528,17 @@ Web场景的Spring容器启动，在onRefresh的时候，会调⽤创建web服�
 
 仅需要编写⼀个  WebMvcConfi gurer  配置类，并标注  @EnableWebMvc 即可 全⼿动模式 ○@EnableWebMvc : 禁⽤默认配置 ○ WebMvcConfigurer  组件：定义MVC的底层⾏为
 
-### WebMvcAutoConfiguration 到底⾃动配置了哪些规则。
+### WebMvcAutoConfiguration原理
 
-###  @EnableWebMvc 禁⽤默认⾏为
+> 一句话：**SpringBoot 提供的 SpringMVC 自动配置类，`spring-boot-starter-web` 引入后自动生效，帮我们自动装配好 SpringMVC 的各种组件，不用手动写 XML 或者 @Bean 去注册视图解析器、消息转换器、静态资源规则等。**
 
- @EnableWebMvc  给容器中导⼊  DelegatingWebMvcConfiguration  组件，   他WebMvcConfigurationSupport  
+> 全类名：`org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration`
 
-2. WebMvcAutoConfiguration  有⼀个核⼼的条件注解,  @ConditionalOnMissingBean(Web MvcConfigurationSupport.class)  ，容器中没有 WebMvcConfigurationSupport  ， W ebMvcAutoConfiguration  才⽣效. 
+生效条件
 
-3. @EnableWebMvc 导⼊  WebMvcConfigurationSupport  导致  WebMvcAutoConfiguratio n  失效。导致禁⽤了默认⾏为
+#### 效果
 
-@EnableWebMVC 禁⽤了 Mvc的⾃动配置 
-
-WebMvcConfigurer 定义SpringMVC底层组件的功能类
-
-
-
-### WebMvcConfigurer 功能
+####  WebMvcConfigurer接⼝
 
 `WebMvcAutoConfiguration` 是 Spring Boot Web 的**自动配置核心**，自动装配 SpringMVC 全组件；
 
@@ -3291,9 +3571,75 @@ WebMvcConfigurer 定义SpringMVC底层组件的功能类
 | **configurePathMatch**         | **路径匹配规则**         | 开启 / 关闭后缀匹配、设置路径匹配规则                 |
 | **configureAsyncSupport**      | **异步请求配置**         | 配置异步请求超时时间、异步线程池                      |
 
-## 最佳实践
+#### 静态资源规则源码
 
-## 三种方式
+```
+ 1. 
+规则⼀：访问： 
+s/ 
+下找资源.
+ /webjars/** 
+路径就去 
+a. 
+maven 导⼊依赖
+b.
+ 2. 
+规则⼆：访问： 
+classpath:/META-INF/resources/webjar /** 
+路径就去 
+静态资源默认的四个位置找资源
+ 
+a. classpath:/META-INF/resources/ 
+b. classpath:/resources/ 
+c. classpath:/static/ 
+d. classpath:/public/ 
+3. 
+规则三：静态资源默认都有缓存规则的设置
+a. 
+所有缓存的设置，直接通过配置⽂件： 
+spring.web 
+b. 
+cachePeriod： 缓存周期； 多久不⽤找服务器要新的。 默认没有，以s为单位
+c. 
+cacheControl： HTTP缓存控制；https://developer.mozilla.org/zh
+CN/docs/Web/HTTP/Caching
+ d. 
+useLastModified：是否使⽤最后⼀次修改。配合HTTP Cache规则
+```
+
+####  EnableWebMvcConfiguration
+
+#### **为什么容器中放⼀个 WebMvcConfigurer  就能配置底层⾏为**
+
+1. WebMvcAutoConfiguration 是⼀个⾃动配置类，它⾥⾯有⼀个  EnableWebMvcConfiguration 
+2. EnableWebMvcConfiguration 继承与 DelegatingWebMvcConfiguration ，这两个都⽣效
+3. DelegatingWebMvcConfiguration 利⽤ DI 把容器中所有WebMvcConfigurer  注⼊进来
+4. 别⼈调⽤ ` DelegatingWebMvcConfiguration ` 的⽅法配置底层规则，⽽它调⽤所有 
+   WebMvcConfigurer 的配置底层⽅法。
+
+####  **WebMvcConfigurationSupport**
+
+### WebMvcAutoConfiguration 到底⾃动配置了哪些规则。
+
+####  @EnableWebMvc 禁⽤默认⾏为
+
+ @EnableWebMvc  给容器中导⼊  DelegatingWebMvcConfiguration  组件，   他WebMvcConfigurationSupport  
+
+2. WebMvcAutoConfiguration  有⼀个核⼼的条件注解,  @ConditionalOnMissingBean(Web MvcConfigurationSupport.class)  ，容器中没有 WebMvcConfigurationSupport  ， W ebMvcAutoConfiguration  才⽣效. 
+
+3. @EnableWebMvc 导⼊  WebMvcConfigurationSupport  导致  WebMvcAutoConfiguratio n  失效。导致禁⽤了默认⾏为
+
+@EnableWebMVC 禁⽤了 Mvc的⾃动配置 
+
+WebMvcConfigurer 定义SpringMVC底层组件的功能类
+
+
+
+
+
+### 最佳实践
+
+#### 三种方式
 
 SpringBoot Web 开发场景 **3 种配置方式**：
 
@@ -3307,7 +3653,7 @@ SpringBoot Web 开发场景 **3 种配置方式**：
 | 实现 WebMvcConfigurer | 配置类实现 `WebMvcConfigurer` 接口，加 `@Configuration`      | **保留自动配置**，仅做功能扩展，不覆盖默认规则           | 新增拦截器、跨域、自定义静态映射、视图跳转、参数转换器等常规扩展 |
 | @EnableWebMvc 接管    | 配置类标注 `@EnableWebMvc`，可继承 `WebMvcConfigurationSupport` | **彻底禁用 SpringBoot MVC 自动配置**，所有组件需手动配置 | 深度定制 SpringMVC，完全自定义全套 MVC 规则（极少使用）      |
 
-### 两种模式
+#### 两种模式
 
 前后分离模式  ：   @RestController   响应JSON数据
 
@@ -3315,7 +3661,7 @@ SpringBoot Web 开发场景 **3 种配置方式**：
 
 
 
-## web新特性
+### web新特性
 
 |                | WebMvc                | WebFlux 注解版     | WebFlux 函数式版   |
 | -------------- | --------------------- | ------------------ | ------------------ |
@@ -3332,159 +3678,15 @@ SpringBoot Web 开发场景 **3 种配置方式**：
 
 函数式 Web 是 Spring 5.2+ 推出的无注解 Web 编程模型，用 RouterFunction 定义路由、HandlerFunction 处理请求，路由与业务分离，适配 WebFlux 响应式，代码更简洁、灵活、可测试。
 
+## 综合项目实战
+
+SpringBoot-AI骨架项目
+
+> SpringBoot  整合  Spring+SpringMVC+MyBatis+MyBatisPlus+Druid +SpringAI+knf4ij+logback+Spring Security+redis+kafka+EFK+OpenFin+RAG智能客服+三级缓存  进⾏基础骨架项目学习开发
+
 # 高级开发
 
 ## 完整启动流程
-
-## 自动配置
-
-### 1依赖管理机制
-
-1、为什么导⼊starter-web 所有相关依赖都导⼊进来？开发什么场景，导⼊什么场景启动器。
- maven依赖传递原则。A-B-C： A就拥有B和C
-导⼊ 场景启动器。 场景启动器 ⾃动把这个场景的所有核⼼依赖全部导⼊进来
-       2、为什么版本号都不⽤写？
-每个boot项⽬都有⼀个⽗项⽬spring-boot-starter-parent  parent的⽗项⽬是
-spring-boot-dependencies  ⽗项⽬ 版本仲裁中⼼，把所有常⻅的jar的依赖版本都声明好了。
-       3、⾃定义版本号
-利⽤maven的就近原则，直接在当前项⽬ properties 中修改标签中声明⽗项⽬⽤的版本属性的key，直接在导⼊依赖的时候声明版本
-
-<version>版本号</version>
-
-4、第三⽅的jar包， boot⽗项⽬没有管理的需要⾃⾏声明好
-
-```
-<!-- https://mvnrepository.com/artifact/com.alibaba/druid -->
- <dependency>
- <groupId>com.alibaba</groupId>
- <artifactId>druid</artifactId>
- <version>1.2.16</version>
- </dependency>
-```
-
-![image-20250601213915956](C:\Users\DELL\AppData\Roaming\Typora\typora-user-images\image-20250601213915956.png)
-
-### 2自动配置
-
-您需要通过在其中一个 [`@Configuration`](https://docs.springframework.org.cn/spring-framework/docs/7.0.x/javadoc-api/org/springframework/context/annotation/Configuration.html) 类上添加 [`@EnableAutoConfiguration`](https://docs.springframework.org.cn/spring-boot/4.0.0/api/java/org/springframework/boot/autoconfigure/EnableAutoConfiguration.html) 或 [`@SpringBootApplication`](https://docs.springframework.org.cn/spring-boot/4.0.0/api/java/org/springframework/boot/autoconfigure/SpringBootApplication.html) 注解来选择启用自动配置。
-
-|      | 您应该只添加一个 [`@SpringBootApplication`](https://docs.springframework.org.cn/spring-boot/4.0.0/api/java/org/springframework/boot/autoconfigure/SpringBootApplication.html) 或 [`@EnableAutoConfiguration`](https://docs.springframework.org.cn/spring-boot/4.0.0/api/java/org/springframework/boot/autoconfigure/EnableAutoConfiguration.html) 注解。我们通常建议您只将其中一个添加到您的主 [`@Configuration`](https://docs.springframework.org.cn/spring-framework/docs/7.0.x/javadoc-api/org/springframework/context/annotation/Configuration.html) 类中。 |
-| ---- | ------------------------------------------------------------ |
-|      |                                                              |
-
-禁用自动配置 您可以使用 [`@SpringBootApplication`](https://docs.springframework.org.cn/spring-boot/4.0.0/api/java/org/springframework/boot/autoconfigure/SpringBootApplication.html) 的 exclude 属性来禁用它们，如以下示例所示
-
-```
-@SpringBootApplication(exclude = { DataSourceAutoConfiguration.class })
-public class MyApplication {
-
-}
-```
-
-
-
-#### 自动配置
-
-⾃动配置的 Tomcat、SpringMVC 等，导⼊场景，容器中就会⾃动配置好这个场景的核⼼组件。
-以前：DispatcherServlet、ViewResolver、CharacterEncodingFilter....现在：⾃动配置好的这些组件
-验证：容器中有了什么组件，就具有什么功能
-
-```
-public static void main(String[] args) {
- //java10局部变量类型的⾃动推断
-var ioc = SpringApplication.run(MainApplication.class, args);
- //1、获取容器中所有组件的名字
-String[] names = ioc.getBeanDefinitionNames();
- //2、挨个遍历：
-// dispatcherServlet beanNameViewResolver characterEncodingFilte multipartResolver
- // SpringBoot 把以前配置的核⼼组件现在都给我们⾃动配置好了。
-for (String name : names) {
- System.out.println(name);
- }
- }
-```
-
-**默认的包扫描规则**
-
- @SpringBootApplication  标注的类就是主程序类 SpringBoot只会扫描主程序所在的包及其下⾯的⼦包，
-
-⾃动的component-scan功能 ⾃定义扫描路径
-
-@SpringBootApplication(scanBasePackages = "com.zxy")
-
-@ComponentScan("com.zxy")  直接指定扫描的路径
-
-
-
-**配置默认值** 
-
-配置⽂件的所有配置项是和某个类的对象值进⾏⼀⼀绑定的。 绑定了配置⽂件中每⼀项值的类： 属性类。 ⽐如： ServerProperties  绑定了所有Tomcat服务器有关的配置 MultipartProperties  绑定了所有⽂件上传相关的配置 ....参照官⽅⽂档：或者参照 绑定的  属性类。
-
- 按需加载⾃动配置 ,导⼊场景 spring-boot-starter-web  场景启动器除了会导⼊相关功能依赖，导⼊⼀个 starter  的 spring-boot-starter  ，是所有  starter的tarter  基础核⼼starte
-
-总结： 导⼊场景启动器、触发  spring-boot-autoconfigure  这个包的⾃动配置⽣效、容器 中就会具有相关场景的功能
-
-spring-boot-starter  导⼊了⼀个包  都是各种场景的 spring-boot-autoconfigure  。包⾥AutoConfiguration  ⾃动配置类 虽然全场景的⾃动配置都在  spring-boot-autoconfigure  这个包，但是不是全都 开启的。  导⼊哪个场景就开启哪个⾃动配置
-
-#### **启动流程**
-
-![image-20250601215235588](C:\Users\DELL\AppData\Roaming\Typora\typora-user-images\image-20250601215235588.png)
-
-**1、导⼊ starter-web  ：导⼊了web开发场景**
-
-1、场景启动器导⼊了相关场景的所有依赖： starter-json  、 starter-tomcat  、 sp ringmvc  
-
-2、每个场景启动器都引⼊了⼀个 spring-boot-starter  ，核⼼场景启动器。
-
- 3、核⼼场景启动器引⼊了 spring-boot-autoconfigure  包。
-
- 4、 spring-boot-autoconfigure  ⾥⾯囊括了所有场景的所有配置。
-
- 5、只要这个包下的所有类都能⽣效，那么相当于SpringBoot官⽅写好的整合功能就⽣效了。
-
- 6、SpringBoot默认却扫描不到  spring-boot-autoconfigure  下写好的所有配置类。 （这些配置类给我们做了整合操作），默认只扫描主程序所在的包。
-
-**2、主程序： @SpringBootApplication**
-
-1、 @SpringBootApplication  由三个注解组成 @SpringBootConfiguration  、 @E nableAutoConfiguratio  、 @ComponentScan 
-
- 2、SpringBoot默认只能扫描⾃⼰主程序所在的包及其下⾯的⼦包，扫描不到  spring-boo t-autoconfigure  包中官⽅写好的配置类 
-
-3、 @EnableAutoConfiguration  ：SpringBoot 开启⾃动配置的核⼼。 
-
-1. 是由 @Import(AutoConfigurationImportSelector.class)  提供功能：批量 给容器中导⼊组件。 
-
-2. SpringBoot启动会默认加载 142个配置类。 
-
-3. 这142个配置类来⾃于 spring-boot-autoconfigure  下  META-INF/spring/o rg.springframework.boot.autoconfigure.AutoConfiguration.import s  ⽂件指定的 项⽬启动的时候利⽤ @Import 批量导⼊组件机制把  autoconfigure  包下的142  xx xxAutoConfiguration  类导⼊进来（⾃动配置类） 虽然导⼊了 142  个⾃动配置类 
-
-4、按需⽣效： 并不是这 142  个⾃动配置类都能⽣效 每⼀个⾃动配置类，都有条件注解 @ConditionalOnxxx  ，只有条件成⽴，才能⽣效
-
-**3、 xxxxAutoConfiguration  ⾃动配置类**
-
-1、给容器中使⽤@Bean 放⼀堆组件。
-
- 2、每个⾃动配置类都可能有这个注解 @EnableConfigurationProperties(ServerPr operties.class)  ，⽤来把配置⽂件中配的指定前缀的属性值封装到  xxxPropertie属性类中 
-
-3、以Tomcat为例：把服务器的所有配置都是以  server  开头的。配置都封装到了属性类中
-
-4、给容器中放的所有组件的⼀些核⼼参数，都来⾃于 xxxProperties ，xxxProperties 都是和配置⽂件绑定。
-
-  只需要改配置⽂件的值，核⼼组件的底层参数都能修改
-
-#### **核⼼流程总结：**
-
- 1、导⼊ starter 就会导⼊autoconfigure  包
-
-2 autoconfigure  包⾥⾯ 有⼀个⽂件   META-INF/spring/org.springframework.bo ot.autoconfigure.AutoConfiguration.imports  ,⾥⾯指定的所有启动要加载的⾃动配 置类 
-
-3、@EnableAutoConfiguration 会⾃动的把上⾯⽂件⾥⾯写的所有⾃动配置类都导⼊进来xxxAutoConfiguration 是有条件注解进⾏按需加载
-
-4、 xxxAutoConfiguration  给容器中导⼊⼀堆组件，组件都是从  xxxProperties  中提取 属性值 
-
-5、 xxxProperties  ⼜是和配置⽂件进⾏了绑定
-
-导⼊ starter  、修改配置⽂件，就能修改底层⾏为。
 
 ## 注解
 
@@ -3654,7 +3856,55 @@ SpringBoot框架的框架、底层基于Spring。能调整每⼀个场景的底�
 3. 分析组件：  分析到  RedisAutoConfiguration   给容器中放了  给业务代码中⾃动装配  StringRedisTemplate 
 4.  定制化  修改配置⽂件 StringRedisTemplate  ⾃定义组件，⾃⼰给容器中放⼀个  StringRedisTemplate 
 
-## 原理
+## 事件和监听器
+
+> 底层是 Spring 的事件机制（`ApplicationEvent`），**观察者模式**，用于解耦：发布者只管发事件，不关心谁监听；监听器负责处理事件。
+
+生命周期
+
+## 自动配置原理
+
+## @SpringApplication
+
+```
+@Configuration
+@EnableAutoConfiguration
+@ComponentScan
+public @interface SpringBootApplication {}
+
+```
+
+1. **@Configuration** 标记当前类是配置类，允许在类内部使用 `@Bean` 注册 Bean 到 Spring 容器。
+2. **@EnableAutoConfiguration** 开启 SpringBoot 自动装配；根据项目依赖，自动创建 Bean。
+
+> 底层读取 `META‑INF/spring/org.springframework.boot.autoconfigure.imports` 文件，导入大量自动配置类。
+
+3. **@ComponentScan** 组件扫描，扫描 `@Component/@Service/@Repository/@Controller`，把类交给 Spring 管理
+
+### 包扫描规则
+
+> **默认规则：扫描【启动类所在包及其所有子包】**
+
+示例： 启动类全类名：`com.demo.SpringbootDemoApplication`
+
+- ✅会扫描：`com.demo`、`com.demo.controller`、`com.demo.service`
+- ❌**不会扫描**：`com.other`（不在启动类同级 / 子包，不会被扫描，Bean 不生效）
+
+解决方案：指定扫描包
+
+方式 1：`@SpringBootApplication(scanBasePackages = "com")`
+
+```
+@SpringBootApplication(scanBasePackages = {"com.demo","com.other"})
+public class SpringbootDemoApplication {
+}
+```
+
+方式 2：单独写 `@ComponentScan(basePackages = "com")`
+
+> 坑：启动类放错包，导致 Controller、Service 不生效，访问 404。
+
+## ⾃定义starter
 
 ## SpringBoot事务管理
 

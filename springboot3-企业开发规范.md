@@ -54,29 +54,224 @@ com.company.project
 
 ## 二、命名规范
 
-| 对象     | 规则                | 示例                                                                  |
-| ------ | ----------------- | ------------------------------------------------------------------- |
-| 类      | 大驼峰 + 类型后缀        | `UserController` / `OrderServiceImpl` / `UserDTO` / `PayStatusEnum` |
-| 方法     | 小驼峰 + 动词开头        | `getUserById` / `createOrder` / `listByCondition`                   |
-| 常量     | 全大写下划线            | `MAX_RETRY_TIMES`                                                   |
-| 包名     | 全小写、单数            | `controller` 不是 `controllers`                                       |
-| 数据库表   | 小写下划线             | `user_order`、`order_item`                                           |
-| 数据库字段  | 小写下划线             | `create_time`、`user_id`                                             |
-| 索引     | 前缀语义              | 主键 `pk_`、唯一 `uk_`、普通 `idx_`                                         |
-| 接口 URL | 名词复数 + kebab-case | `/api/v1/order-items`                                               |
-| 测试类    | 被测类名 + Test       | `UserServiceTest`                                                   |
+| 对象       | 规则                  | 示例                                                         |
+| ---------- | --------------------- | ------------------------------------------------------------ |
+| 类         | 大驼峰 + 类型后缀     | `UserController` / `OrderServiceImpl` / `UserDTO` / `PayStatusEnum` |
+| 方法       | 小驼峰 + 动词开头     | `getUserById` / `createOrder` / `listByCondition`            |
+| 常量       | 全大写下划线          | `MAX_RETRY_TIMES`                                            |
+| 包名       | 全小写、单数          | `controller` 不是 `controllers`                              |
+| 数据库表   | 小写下划线            | `user_order`、`order_item`                                   |
+| 数据库字段 | 小写下划线            | `create_time`、`user_id`                                     |
+| 索引       | 前缀语义              | 主键 `pk_`、唯一 `uk_`、普通 `idx_`                          |
+| 接口 URL   | 名词复数 + kebab-case | `/api/v1/order-items`                                        |
+| 测试类     | 被测类名 + Test       | `UserServiceTest`                                            |
 
-### POJO 分类（面试也爱问）
+### springboot
 
-| 后缀      | 全称                       | 用途          | 流向                        |
-| ------- | ------------------------ | ----------- | ------------------------- |
-| PO / DO | Persistant/Domain Object | 与表字段一一对应    | Mapper ↔ Service          |
-| DTO     | Data Transfer Object     | 接口入参        | 前端 → Controller → Service |
-| VO      | View Object              | 接口出参（可裁剪字段） | Service → Controller → 前端 |
-| BO      | Business Object          | 业务中间对象      | Service 内部                |
-| Query   | 查询参数                     | 含分页/排序字段    | 前端 → Controller           |
+#### 包命名
 
-***
+（全小写，分层，禁止大写，使用`.`分隔）
+
+**反向域名风格，业务模块分层**
+
+| 目录        | 状态  | 说明                                         |
+| ----------- | ----- | -------------------------------------------- |
+| aspect      | ✅正常 | 通用 AOP 切面（日志、限流）                  |
+| audit       | ✅正常 | 审计日志全套（注解、切面、service、DO）      |
+| common      | ✅正常 | 工具、异常、枚举、常量                       |
+| config      | ✅正常 | Bean 配置、第三方 Bean                       |
+| controller  | ✅正常 | http 接口层                                  |
+| client      | ✅正常 | 远程调用                                     |
+| dto         | ✅正常 | 接口入参                                     |
+| entity      | ✅正常 | DO 数据库实体                                |
+| integration | ✅正常 | 第三方集成层（Redis、ES、S3、B 站 API 封装） |
+| mapper      | ✅正常 | Mybatis‑Plus Mapper 接口                     |
+| service     | ✅正常 | 业务接口 + impl 实现                         |
+| task        | ✅正常 | 定时、异步任务                               |
+| vo          | ✅正常 | 返回前端视图对象                             |
+
+```
+com.algoviz.video
+├── aspect                # AOP切面：请求日志、限流
+├── audit                 # 审计日志（注解、切面、DO、service）
+├── client                # ✅【微服务专用】Feign接口 + 降级实现，调用其他微服务
+│   ├── auth
+│   │   ├── AuthFeignClient.java
+│   │   └── AuthFallback.java
+│   └── search
+│       └── SearchFeignClient.java
+├── common                # 本服务局部公共（优先复用common-core，不要重复造轮子）
+├── config                # Bean配置、nacos、redis、es、mq的Bean装配
+├── controller            # http对外接口
+├── dto                   # http接口入参DTO
+├── entity                # DO数据库实体
+├── integration           # ✅外部第三方调用（非微服务）
+│   ├── redis
+│   ├── es
+│   ├── s3                # RustFS/SeaweedFS对象存储
+│   └── bilibili          # B站API、biliup‑rs调用
+├── mapper                # Mybatis‑Plus Mapper
+├── service
+│   ├── impl
+├── task                  # 定时、异步任务
+├── vo                    # 返回前端VO
+├── bo                    # 业务中间对象，按需新增
+└── VideoServiceApplication.java #启动类
+```
+
+> 包命名全部小写，不使用下划线；模块多可以继续拆分：`com.xxx.oj.video`、`com.xxx.oj.judge`。
+
+#### 类命名
+
+（大驼峰 UpperCamelCase）
+
+| 类型           | 命名示例                               | 规则                                                         |
+| -------------- | -------------------------------------- | ------------------------------------------------------------ |
+| Controller     | `VideoController`、`ProblemController` | 业务名 + Controller，每个 Controller 对应一组接口            |
+| Service 接口   | `VideoService`                         | 业务名 + Service，**接口名不带 I 前缀**（阿里规范，不写 IVideoService） |
+| Service 实现类 | `VideoServiceImpl`                     | 业务名 + ServiceImpl                                         |
+| Mapper 接口    | `VideoMapper`                          | 表名 + Mapper                                                |
+| DO 数据库实体  | `VideoDO`                              | 表名 + DO，和数据库表一一对应                                |
+| DTO（入参）    | `VideoPublishDTO`                      | 业务 + DTO，接收前端 post/json 参数                          |
+| VO（出参）     | `VideoVO`、`VideoDetailVO`             | 业务 + VO，返回前端数据                                      |
+| BO 业务对象    | `VideoTaskBO`                          | service 内部流转对象，不对外暴露                             |
+| 配置类         | `RustFsS3Config`、`WebConfig`          | 功能 + Config                                                |
+| 切面 Aspect 类 | `RequestLogAspect`、`RateLimitAspect`  | 功能 + Aspect，加`@Aspect`                                   |
+| 工具类         | `S3Util`、`JsonUtil`                   | 功能 + Util，全部 static 方法                                |
+| 枚举           | `VideoStatusEnum`                      | 业务 + Enum                                                  |
+| 异常类         | `BusinessException`                    | 业务 + Exception                                             |
+
+> 禁止：`VideoInfo`、`VideoModel`模糊命名；分清 DO/DTO/VO/BO。
+
+#### 资源文件
+
+cert 密钥文件
+
+```
+src/main/resources
+├── application.yml               # 主配置
+├── application-dev.yml           # 开发环境
+├── application-test.yml          # 测试环境
+├── application-prod.yml          # 生产环境
+├── db
+│   └── schema.sql                # 建表脚本
+├── mapper                        # Mybatis XML映射文件
+├── static                        # 静态资源（极少用，业务文件存对象存储RustFS/SeaweedFS）
+└── scripts                       # shell/powershell、工具脚本（biliup‑rs脚本等）
+```
+
+### 微服务
+
+**一、Maven 多模块整体工程（外层）**
+
+```
+algoviz-parent               # 父pom（聚合工程）
+├── algoviz‑common‑core      # 公共核心模块：Result、异常、工具、常量、通用注解（所有微服务依赖）
+├── algoviz‑common‑feign     # 【可选】feign公共接口、远程调用DTO（API契约包）
+├── algoviz‑service‑video    # 视频微服务（业务服务，你的单体改造过来）
+├── algoviz‑service‑auth     # 认证授权微服务
+└── algoviz‑service‑search   # 搜索微服务
+```
+
+**二、单个微服务内部包（以 algoviz‑service‑video 为例）**
+
+```
+com.algoviz.video
+├── aspect                # AOP切面：请求日志、限流
+├── audit                 # 审计日志（注解、切面、DO、service）
+├── client                # ✅【微服务专用】Feign接口 + 降级实现，调用其他微服务
+│   ├── auth
+│   │   ├── AuthFeignClient.java
+│   │   └── AuthFallback.java
+│   └── search
+│       └── SearchFeignClient.java
+├── common                # 本服务局部公共（优先复用common-core，不要重复造轮子）
+├── config                # Bean配置、nacos、redis、es、mq的Bean装配
+├── controller            # http对外接口
+├── dto                   # http接口入参DTO
+├── entity                # DO数据库实体
+├── integration           # ✅外部第三方调用（非微服务）
+│   ├── redis
+│   ├── es
+│   ├── s3                # RustFS/SeaweedFS对象存储
+│   └── bilibili          # B站API、biliup‑rs调用
+├── mapper                # Mybatis‑Plus Mapper
+├── service
+│   ├── impl
+├── task                  # 定时、异步任务
+├── vo                    # 返回前端VO
+├── bo                    # 业务中间对象，按需新增
+└── VideoServiceApplication.java #启动类
+```
+
+**三、资源文件 resources（微服务）**
+
+```
+src/main/resources
+├── bootstrap.yml               # ✅微服务优先bootstrap，nacos配置放这里
+├── bootstrap-dev.yml
+├── bootstrap-prod.yml
+├── application.yml             # 本地少量配置
+├── mapper                      # mybatis xml
+└── db                          # flyway迁移脚本 V1_0_0__xxx.sql
+```
+
+### 前端
+
+```
+src/assets
+├── images          # 图片
+│   ├── common      # 公共图标、logo
+│   └── page‑home   # 首页页面专属图片
+├── videos          # 内置演示视频（少量，不要放大视频）
+├── fonts           # 字体文件
+└── styles          # scss/css全局样式
+```
+
+#### 视频
+
+```
+/static
+├─/video           # 全部视频根目录
+│  ├─/cover        # 视频封面图、视频缩略图
+│  ├─/original     # 原始源文件（不对外访问，后台转码用）
+│  ├─/hd           # 高清转码视频
+│  ├─/sd           # 标清转码视频
+│  ├─/preview      # 预览小片段、预告片
+│  ├─/trailer      # 宣传片、广告片
+│  ├─/short        # 短视频
+│  ├─/live         # 直播回放录像
+│  └─/temp         # 临时上传待处理视频（定期清理）
+
+```
+
+### 分支命名规范
+
+**本地临时开发分支**
+
+统一前缀 `类型/issue编号-简短描述`，有 issue 优先带上 issue 号，开源协作更清晰
+
+| 分支前缀         | 用途                                            | 来源分支  | 合并目标分支                       |
+| ---------------- | ----------------------------------------------- | --------- | ---------------------------------- |
+| `feat/`          | 新功能（前端页面、后端接口、新组件等）          | `develop` | `develop`                          |
+| `fix/`           | 普通 bug 修复                                   | `develop` | `develop`                          |
+| `hotfix/`        | `main`线上紧急故障                              | `main`    | `main` + `develop`（两边同步修复） |
+| `refactor/`      | 重构（无业务逻辑变更，前后端代码整理）          | `develop` | `develop`                          |
+| `docs/`          | 文档、README、注释、官网文案修改                | `develop` | `develop`                          |
+| `style/`         | 纯格式调整（eslint/prettier，不改动逻辑）       | `develop` | `develop`                          |
+| `test/`          | 单元测试 /e2e 测试补充                          | `develop` | `develop`                          |
+| `release/v*.*.*` | 版本预发布分支，只做版本号、changelog、最终测试 | `develop` | `main` + `develop`                 |
+
+**✅ 分支命名示例**
+
+```
+feat/#42-user-login-page
+fix/#58-api-timeout
+hotfix/#62-main-cors-error
+refactor/backend-controller-split
+docs/update-install-guide
+release/v1.2.0
+```
 
 ## 三、API 设计规范
 
@@ -96,6 +291,9 @@ DELETE /api/v1/users/{id}                    # 删除
 - 前后端分离项目加 `/api` 前缀，网关按前缀路由
 
 ### 统一返回体
+
+URL：小写中划线，名词复数   /api/videos/{videoId}/comments
+动词：GET 查询 / POST 新增 / PUT 更新 / DELETE 删除
 
 ```json
 { "code": 200, "message": "success", "data": { "id": 1 }, "traceId": "a1b2c3" }
@@ -118,6 +316,8 @@ public class PageQuery {
 ***
 
 ## 四、数据库规范（互联网惯例）
+
+> 变更走 Flyway 脚本 `V1_0_1__add_video_like.sql`（目录里已预留 `db/flyway`，正好配套）。**SQL 变更脚本提交 PR 审核后才可执行**。
 
 ### 每张表必备五字段
 
@@ -150,6 +350,32 @@ CREATE TABLE user_order (
 
 ***
 
+1. 数据库审计字段（必加）
+
+   ```
+   create_by, create_time, update_by, update_time, deleted
+   ```
+
+   （逻辑删除），所有业务表统一带上。
+
+   > 逻辑删除：不要物理删除数据，便于数据追溯。
+
+2. **数据库版本管理 Flyway / Liquibase** 脚本版本化管理，团队协作自动建表、升级结构，不需要手动执行 SQL。
+
+3. **唯一索引**：用户名、邮箱、第三方平台唯一标识，防止重复注册。
+
+4. **SQL 打印 / 慢 SQL 监控**（开发环境）MyBatis-Plus 日志。
+
+5. 数据库修改日志，任何对数据库的修改都要保存下来
+
+| 项目     | 规范                                                         |
+| :------- | :----------------------------------------------------------- |
+| 表名     | 蛇形小写，带业务前缀：`video_info`、`user_account`           |
+| 必备字段 | `id`、`create_time`、`update_time`、`deleted`（逻辑删除）    |
+| 字段命名 | 蛇形，禁用数据库关键字；布尔用 `is_xxx`（tinyint）           |
+| 索引命名 | 主键 `pk_`、唯一 `uk_表_字段`、普通 `idx_表_字段`            |
+| 禁止     | 外键约束（应用层维护）、存储过程、`select *`、大字段混在主表 |
+
 ## 五、编码规范（阿里巴巴 Java 手册精选）
 
 按入职后 Code Review 最常打回的顺序：
@@ -173,6 +399,54 @@ CREATE TABLE user_order (
 
 > 合并自《springboot3-日志输出清单.md》。本章回答三件事：**在哪打（8 个位置）、怎么打（编写规则）、打什么级别**。
 > 基础设施日志（GC / MySQL / Redis / Nginx）不在本章范围，见《springboot3-日志全景-位置与级别.md》。
+
+### 日志级别使用场景
+
+| 级别  | 场景                                     |
+| :---- | :--------------------------------------- |
+| DEBUG | 开发调试细节，生产默认关闭               |
+| INFO  | 业务关键节点（登录、支付、状态流转）     |
+| WARN  | 可自愈异常（重试成功、降级触发、慢接口） |
+| ERROR | 需要人工介入（DB 失败、第三方连续超时）  |
+
+> ERROR 只在"需要处理"时打，禁止 catch 里无脑 error（会刷爆告警）。补一条脱敏清单：手机号/邮箱/密码/token/身份证 必脱敏后入日志。
+
+### 输出规范
+
+| 问题     | 对应字段                          |
+| -------- | --------------------------------- |
+| 谁       | traceId / userId                  |
+| 在哪     | 类名 + 方法名（日志框架自动输出） |
+| 做了什么 | 入参（脱敏后）                    |
+| 结果如何 | 返回值 / 异常堆栈 / 状态          |
+| 花了多久 | 耗时 ms                           |
+
+### 日志文件
+
+**按级别拆分（Logback 常见做法）**
+
+| 文件        | 内容                     | 生产环境     |
+| :---------- | :----------------------- | :----------- |
+| `debug.log` | 调试细节                 | 通常关闭落盘 |
+| `info.log`  | 业务关键节点             | 开           |
+| `warn.log`  | 可自愈异常、降级触发     | 开           |
+| `error.log` | 需人工介入的错误，含堆栈 | 开，配告警   |
+
+> 很多团队不会 4 个全拆，常见是 `app.log`（info 及以上）+ `error.log` 单独拆出来方便告警和排障，共 2 个。
+
+**按用途/来源拆分（数量随架构增长）**
+
+| 日志           | 来源            | 说明                                                         |
+| :------------- | :-------------- | :----------------------------------------------------------- |
+| 业务日志       | 应用打印        | 状态流转、关键操作，量大时单独文件                           |
+| 访问日志       | Nginx / Tomcat  | `access.log`，QPS、状态码、耗时                              |
+| 慢 SQL 日志    | MySQL           | `slow.log`，超过 `long_query_time` 落盘                      |
+| 慢接口日志     | 应用 AOP 自埋   | 超过阈值的接口调用                                           |
+| 慢外部调用日志 | 应用自埋        | 第三方 API 超时统计（如 B 站 API）                           |
+| GC 日志        | JVM             | `-Xlog:gc*:file=gc.log`，排查内存问题                        |
+| JVM 崩溃日志   | JVM             | `hs_err_pid*.log`，OOM/段错误时自动生成                      |
+| 审计日志       | 应用            | 谁在什么时间做了什么，合规用，您文档里的 audit 模块就是干这个的 |
+| 中间件日志     | Redis / ES / MQ | 一般在容器/主机层，不归应用管                                |
 
 ### 6.1 设计原则：用排查场景反推
 
@@ -449,12 +723,31 @@ fix(auth): 修复 token 刷新后旧 token 仍可用的问题
 ```
 
 - 一个 commit 只做一件事；禁止 "update"、"修改bug" 这种 message
-
 - **Code Review 是合并必经环节**：PR 描述写清改了什么、为什么改、怎么验证
 
-***
+### GitHupFlow 流程规范
 
-## 九、协作全流程（需求到上线）
+1. main 分支始终保持可发布状态，develop 为日常集成分支
+2. 从 develop 拉 feat/#issue-xxx 分支开发
+3. 提 PR → CI 自动构建 + 单测通过 → 至少 1 人 Code Review 通过
+4. 合并回 develop（squash merge，保持提交历史干净）
+5. 发版：develop → release/v*.*.* → 验证通过 → 合入 main + 打 tag
+6. 线上故障：从 main 拉 hotfix/#issue-xxx → 修复合入 main + develop + 打补丁版本 tag
+
+### 版本与发布规范
+
+- 版本号遵循 SemVer：`主版本.次版本.修订号`（不兼容变更 / 新功能 / 修复）
+- Tag 格式 `v1.2.0`，打在 main 上，**推 tag 后同步推送分支**
+- 每次发版更新 `CHANGELOG.md`（Keep a Changelog 格式）
+
+## 九、测试流程
+
+**流程当 checklist 用，深度按风险裁剪，能脚本的绝不用手**
+
+1. **环境漂移**：测试环境和生产的 MySQL 版本、Nginx 配置、Docker Compose 不一致，测试全绿上线照样炸。解法就是“一套 compose 定义，本地和生产共用”，你已经这么做了。
+2. **脚本腐化**：ps1 回归脚本失败时，小团队的本能是“先怀疑脚本坏了”然后注释掉断言——三个月后脚本形同虚设。纪律是：脚本失败要么修代码、要么明确改断言并写原因，禁止静默跳过。
+
+开发自测 → 提测准入 → 冒烟 → 用例执行 → 缺陷修复回归 → 预发验证 → 上线验证
 
 ```
 需求评审（PRD）
@@ -973,3 +1266,74 @@ public class CorsConfig implements WebMvcConfigurer {
 - [ ] 上传文件只校验了后缀，没查文件头
 
 - [ ] CORS 配了 `*` 还开了 allowCredentials
+
+# 缓存规范（Redis）
+
+| 项目   | 规范                                                         |
+| :----- | :----------------------------------------------------------- |
+| Key    | `服务:模块:业务:id`，如 `video:play:count:10086`             |
+| TTL    | 必填，禁用永久 key；加随机偏移防雪崩                         |
+| 防穿透 | 空值缓存短 TTL / 布隆过滤器                                  |
+| 防击穿 | 热点 key 互斥锁重建                                          |
+| 事务   | 缓存更新先改库再删缓存（Cache Aside），禁用延迟双删以外的花活 |
+
+# 功能实现
+
+**主业务实现**  
+
+**完整链路请求：**  SpringBoot 接收请求 → 参数校验 → 登录鉴权 (JWT) →会话管理 → 业务逻辑 → 调用数据库 → 返回结果，全局异常处理→ 返回前端渲染
+
+**安全模块** 
+
+- 密码加密
+- 接口防重 接口幂等性
+- 会话管控
+- 数据脱敏
+- 文件上传 数据导出管控
+- 接口速率限制
+- 验证码设置
+
+**基础框架能力**
+
+- 全局统一异常处理、统一返回体、统一错误码
+- 全局统一请求拦截、响应拦截，统一错误处理
+- 通用分页组件
+
+- **API 文档管控**：Knife4j/Swagger 环境开关；生产关闭文档；接口文档版本管理
+- **单元测试 & 集成测试基座**：测试工具类；数据库测试回滚；冒烟测试用例基线
+- **通用文件上传下载服务**
+
+**运维监控**
+
+日志输出:GC日志 jvm崩溃日志 业务日志 框架日志 慢SQL日志 数据库日志
+
+TraceId 全链路日志追踪
+
+- 服务指标监控（JVM、CPU、线程池、连接池）
+- 接口 QPS、耗时、错误率监控统计
+- 异常告警（钉钉 / 邮件）
+
+## 攻击防范
+
+**输入校验防护**
+
+- SQL注入
+- XSS跨站脚本攻击
+- 命令注入/路径遍历
+- 请求参数校验
+- 文件上传攻击
+
+**会话与身份认证攻击**
+
+- 会话劫持
+- 暴力破解
+- CSRF跨站请求
+- JWT/token安全
+- 越权攻击
+
+**网络传输与网络层防护**
+
+- TLS/HTTPS
+- IP 黑白名单
+- CORS 跨域安全
+- WAF 防护（网关层）

@@ -2266,6 +2266,10 @@ CanCommit→PreCommit→DoCommit，解决部分阻塞；依然有一致性问题
 
 # 额外学习内容
 
+## Git-GitHupFlows-CI/CD
+
+Git‑GitLab + WebHook + Jenkins Pipeline + Maven + SonarQube + 静态漏洞分析 + Docker + Harbor + K8s 部署
+
 ## java函数式编程
 
 ## springcloudalibaba
@@ -2309,10 +2313,6 @@ CanCommit→PreCommit→DoCommit，解决部分阻塞；依然有一致性问题
 - kubectl 常用命令
 - 应用部署流程：编写 Deployment + Service YAML → kubectl apply → 验证
 - 日志查看与排障：kubectl logs、kubectl describe、kubectl exec
-
-## CI/CD流水线实战
-
-Git‑GitLab + WebHook + Jenkins Pipeline + Maven + SonarQube + 静态漏洞分析 + Docker + Harbor + K8s 部署
 
 ## EFKBstat
 
