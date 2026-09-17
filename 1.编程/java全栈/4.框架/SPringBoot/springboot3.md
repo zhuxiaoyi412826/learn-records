@@ -8,7 +8,7 @@
 
 3. **使用内置的tomcat服务器不使用内置的tomcat，使用其他的**
 
-4. springframework Environment 自动装配原理
+4. **springframework Environment 自动装配原理**
 
 5. **会自己debug项目，开发新功能。了解web会话管理，HTTP 等**
 
@@ -86,7 +86,7 @@
 
 16. **项目实战:** 网上交友项目实战开发
 
-17. **运维与监控目标:**                                                                                                                                        SpringBoot Actuator 监控端点：健康检查、线程、内存、日志、请求指标
+17. **运维与监控目标:**                                                                                                                                                            SpringBoot Actuator 监控端点：健康检查、线程、内存、日志、请求指标
 
     SpringBoot Admin 可视化监控面板部署使用
 
@@ -136,15 +136,7 @@
 
 [文档]([Spring Boot](https://spring.io/projects/spring-boot))
 
-**版本搭配**
-
-| SpringBoot 版本        | 最低 JDK | 支持 JDK 范围 | 推荐 JDK  | Maven 最低版本 | 包名      |
-| ---------------------- | -------- | ------------- | --------- | -------------- | --------- |
-| 4.0.x                  | 17       | 17‑25         | 21        | 3.6.3+         | jakarta.* |
-| 3.3.x ~3.5.x           | 17       | 17‑25         | 17 / 21   | 3.6.3+         | jakarta.* |
-| 3.0.x‑3.2.x            | 17       | 17‑21         | 17 / 21   | 3.6.3+         | jakarta.* |
-| 2.7.x（最后支持 JDK8） | 8        | 8‑21          | 8 /11 /17 | 3.5.0+         | javax.*   |
-| 2.6.x 及更早           | 8        | 8‑17          | 8 /11     | 3.5.0+         | javax.*   |
+**版本**
 
 | 大版本分支                 | 最新正式版本 | 最低 JDK | 包名      | 开源维护状态                          | 适合场景                                                     |
 | -------------------------- | ------------ | -------- | --------- | ------------------------------------- | ------------------------------------------------------------ |
@@ -3678,15 +3670,23 @@ SpringBoot Web 开发场景 **3 种配置方式**：
 
 函数式 Web 是 Spring 5.2+ 推出的无注解 Web 编程模型，用 RouterFunction 定义路由、HandlerFunction 处理请求，路由与业务分离，适配 WebFlux 响应式，代码更简洁、灵活、可测试。
 
-## 综合项目实战
-
-SpringBoot-AI骨架项目
-
-> SpringBoot  整合  Spring+SpringMVC+MyBatis+MyBatisPlus+Druid +SpringAI+knf4ij+logback+Spring Security+redis+kafka+EFK+OpenFin+RAG智能客服+三级缓存  进⾏基础骨架项目学习开发
-
 # 高级开发
 
 ## 完整启动流程
+
+## 自动配置原理
+
+### 变更自动配置
+
+## 自动配置工作流程
+
+### bean的加载方式
+
+### bean的加载控制
+
+### bean的依赖属性配置管理
+
+## 自定义Starter
 
 ## 注解
 
@@ -3862,8 +3862,6 @@ SpringBoot框架的框架、底层基于Spring。能调整每⼀个场景的底�
 
 生命周期
 
-## 自动配置原理
-
 ## @SpringApplication
 
 ```
@@ -3908,6 +3906,26 @@ public class SpringbootDemoApplication {
 
 ## SpringBoot事务管理
 
+## 热部署
+
+## 配置高级
+
+### @ConfigurationProperties
+
+### 校验
+
+### 常用计量单位绑定
+
+### 数据类型转换
+
+## 测试
+
+### 加载测试专用属性
+
+### 加载测试专用配置
+
+### web环境模拟测试
+
 # 场景整合
 
 ## 接口层开发
@@ -3915,6 +3933,8 @@ public class SpringbootDemoApplication {
 ## 持久层开发
 
 ## SSM整合
+
+## 监控
 
 ## Lomback
 
@@ -4131,6 +4151,14 @@ public class ChatController {
 2. **CPU 高先看抓到的是业务线程还是 GC 线程**——后者是内存问题，方向完全不同，别在代码里白找死循环。
 3. **调大连接池/线程池只是止血不是治疗**——`HikariPool connection is not available` 必须用 `leak-detection-threshold` 或 `show processlist` 找到占连接的元凶。
 
+## 缓存
+
+### 任务
+
+## 邮件
+
+## 消息
+
 # 项目规范
 
 # 多模块项目
@@ -4262,4 +4290,3 @@ demo-common /demo-service/demo-controller
 | **异步支持** | 需要额外配置（如 Servlet 3.0 异步特性）           | 原生支持异步流（如 Spring WebFlux）                 |
 | **典型场景** | 中小型 Web 应用、企业内部系统                     | 高并发 API、实时数据流处理、微服务网关              |
 
-# Reactive Stack 项目实战
