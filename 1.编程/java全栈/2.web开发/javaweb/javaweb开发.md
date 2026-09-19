@@ -331,3 +331,880 @@ GET：
 | 5xx 服务端错误 | 504    | Gateway Timeout       | 网关超时       | 接口请求长时间无响应              |
 
 # Servlet
+
+> Servlet 是 Java EE 的服务端组件，运行在 Tomcat 这类 Servlet 容器里，用来接收 HTTP 请求、处理业务、返回 HTTP 响应，是 Java Web 的底层原生 API，SpringMVC 底层就是基于 Servlet 实现。
+>
+> 是运行在服务端(tomcat)的Java小程序，是sun公司提供一套定义动态资源规范; 从代码层面上来讲Servlet就是一个接口
+>
+> 用来接收、处理客户端请求、响应给浏览器的动态资源。在整个Web应用中，Servlet主要负责接收处理请求、协同调度功能以及响应数据。我们可以把Servlet称为Web应用中的**控制器**
+
++ 不是所有的JAVA类都能用于处理客户端请求,能处理客户端请求并做出响应的一套技术标准就是Servlet
++ Servlet是运行在服务端的,所以 Servlet必须在WEB项目中开发且在Tomcat这样的服务容器中运行
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/1681699577344.png)
+
+
+
+这类是完整应用服务器，自带 Servlet 容器，不止 Servlet：
+
+1. **WildFly（原 JBoss AS）**：RedHat 开源，内置 Undertow；完整 JakartaEE 实现The Eclips...
+2. **GlassFish**：Oracle/Eclipse，JavaEE/JakartaEE 参考实现，内置 Grizzly
+3. **WebLogic**：Oracle 商业，企业重型应用服务器
+4. **WebSphere / Open Liberty**：IBM；Open Liberty 是开源社区版，内置轻量 Servlet 容器
+
+## 核心要点
+
+1. 属于 **Jakarta Servlet（旧名 javax.servlet）** 规范，不是独立程序，不能直接 main 启动，必须放在 Tomcat/Jetty 容器运行。
+2. 核心接口：`Servlet`，常用实现类 `HttpServlet`，重写 `doGet()`、`doPost()` 处理请求。
+3. 生命周期：
+   - `init()`：第一次访问时**只执行一次**，初始化
+   - `service()`：每次请求都会调用，分发 get/post
+   - `destroy()`：容器关闭时销毁
+4. 三个核心对象
+   - `HttpServletRequest`：获取请求参数、请求头、Cookie
+   - `HttpServletResponse`：输出响应、设置响应头、写 Cookie
+   - `ServletContext`：全局上下文，整个 web 应用共享
+
+5. Web.XML
+
+web.xml 是这个项目的唯一总装清单——学名叫"部署描述符（Deployment Descriptor）
+
+Servlet 容器（Tomcat/Jetty）启动时并不知道你写了哪些 Listener、Filter、欢迎页。它会先读 WEB-INF/web.xml，按里面的声明去反射创建对象、建立 URL 映射、组装过滤器链。
+
+一句话：Java 代码里只是"定义"了类，web.xml 才决定它们"如何被装配、何时被调用"。 因为你没用 Spring，没有任何自动配置，所以这个文件就是全部。
+
+## 实现
+
+### UserServlet
+
+```
+import jakarta.servlet.*;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.*;
+import java.io.IOException;
+// @WebServlet(name = "userServlet1", urlPatterns = "/userServlet1")
+// 
+@WebServlet("/hello")
+public class HelloServlet extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        resp.setContentType("text/html;charset=utf-8");
+        resp.getWriter().write("Hello Servlet");
+    }
+}
+```
+
++ 自定义一个类,要继承HttpServlet类
++ 重写service方法,该方法主要就是用于处理用户请求的服务方法
++ HttpServletRequest 代表请求对象,是有请求报文经过tomcat转换而来的,通过该对象可以获取请求中的信息
++ HttpServletResponse 代表响应对象,该对象会被tomcat转换为响应的报文,通过该对象可以设置响应中的信息
++ Servlet对象的生命周期(创建,初始化,处理服务,销毁)是由tomcat管理的,无需我们自己new
++ HttpServletRequest HttpServletResponse 两个对象也是有tomcat负责转换,在调用service方法时传入给我们用的
+
+### web.xml为UseServlet配置请求的映射路径
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/1681550398774.png)
+
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-app_5_0.xsd"
+         version="5.0">
+
+    <servlet>
+        <!--给UserServlet起一个别名-->
+        <servlet-name>userServlet</servlet-name>
+        <servlet-class>com.atguigu.servlet.UserServlet</servlet-class>
+    </servlet>
+
+
+    <servlet-mapping>
+        <!--关联别名和映射路径-->
+        <servlet-name>userServlet</servlet-name>
+        <!--可以为一个Servlet匹配多个不同的映射路径,但是不同的Servlet不能使用相同的url-pattern-->
+        <url-pattern>/userServlet</url-pattern>
+       <!-- <url-pattern>/userServlet2</url-pattern>-->
+        <!--
+            /        表示通配所有资源,不包括jsp文件
+            /*       表示通配所有资源,包括jsp文件
+            /a/*     匹配所有以a前缀的映射路径
+            *.action 匹配所有以action为后缀的映射路径
+        -->
+       <!-- <url-pattern>/*</url-pattern>-->
+    </servlet-mapping>
+
+</web-app>
+```
+
++ Servlet并不是文件系统中实际存在的文件或者目录,所以为了能够请求到该资源,我们需要为其配置映射路径
++ servlet的请求映射路径配置在web.xml中
++ servlet-name作为servlet的别名,可以自己随意定义,见名知意就好
++ url-pattern标签用于定义Servlet的请求映射路径
++ 一个servlet可以对应多个不同的url-pattern
++ 多个servlet不能使用相同的url-pattern
++ url-pattern中可以使用一些通配写法
+  + /        表示通配所有资源,不包括jsp文件
+  + /*      表示通配所有资源,包括jsp文件
+  + /a/*     匹配所有以a前缀的映射路径
+  + *.action 匹配所有以action为后缀的映射路径
+
+### 步骤4 发送请求
+
+开发一个form表单,向servlet发送一个get请求并携带username参数
+
+```
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Servlet 表单 Demo</title>
+    <style>
+        body { font-family: system-ui, "Microsoft YaHei"; padding: 40px; }
+        input { padding: 6px 10px; }
+        button { padding: 6px 16px; cursor: pointer; }
+        .tip { color: #6b7280; margin-top: 12px; }
+    </style>
+</head>
+<body>
+<h2>用户名校验（Servlet Demo）</h2>
+
+<!-- action 由 JS 动态拼接：自动适配 Jetty(/) 与 Tomcat(/servlet_filter_listemer_war) 两种 contextPath -->
+<form id="demoForm" method="get">
+    请输入用户名：<input type="text" name="username" value="atguigu" /> <br><br>
+    <button type="submit">校验</button>
+</form>
+
+<p class="tip">正确用户名是 <b>atguigu</b>，输入相同显示“登录成功”，不同显示“登录失败”。</p>
+
+<script>
+    // /static/demo.html => contextPath 就是 /static/ 之前的那一段
+    var ctx = location.pathname.indexOf('/static/') >= 0
+        ? location.pathname.slice(0, location.pathname.indexOf('/static/'))
+        : '';
+    document.getElementById('demoForm').action = ctx + '/userServlet1';
+</script>
+</body>
+</html>
+
+```
+
+## 注解开发
+
+```
+@WebServlet(name = "userServlet1", urlPatterns = "/userServlet1")
+```
+
+## 生命周期
+
+### 概念
+
+> 什么是Servlet的生命周期
+
+-   应用程序中的对象不仅在空间上有层次结构的关系，在时间上也会因为处于程序运行过程中的不同阶段而表现出不同状态和不同行为——这就是对象的生命周期。
+-   简单的叙述生命周期，就是对象在容器中从开始创建到销毁的过程。
+
+> Servlet容器
+
++ Servlet对象是Servlet容器创建的，生命周期方法都是由容器(目前我们使用的是Tomcat)调用的。这一点和我们之前所编写的代码有很大不同。在今后的学习中我们会看到，越来越多的对象交给容器或框架来创建，越来越多的方法由容器或框架来调用，开发人员要尽可能多的将精力放在业务逻辑的实现上。
+
+> Servlet主要的生命周期执行特点
+
+| 生命周期 | 对应方法                                                 | 执行时机               | 执行次数 |
+| -------- | -------------------------------------------------------- | ---------------------- | -------- |
+| 构造对象 | 构造器                                                   | 第一次请求或者容器启动 | 1        |
+| 初始化   | init()                                                   | 构造完毕后             | 1        |
+| 处理服务 | service(HttpServletRequest req,HttpServletResponse resp) | 每次请求               | 多次     |
+| 销毁     | destory()                                                | 容器关闭               | 1        |
+
+## 生命周期总结
+
+1. 通过生命周期测试我们发现Servlet对象在容器中是单例的
+2. 容器是可以处理并发的用户请求的,每个请求在容器中都会开启一个线程
+3. 多个线程可能会使用相同的Servlet对象,所以在Servlet中,我们不要轻易定义一些容易经常发生修改的成员变量
+4. load-on-startup中定义的正整数表示实例化顺序,如果数字重复了,容器会自行解决实例化顺序问题,但是应该避免重复
+5. Tomcat容器中,已经定义了一些随系统启动实例化的servlet,我们自定义的servlet的load-on-startup尽量不要占用数字1-5
+
+## Servlet继承结构
+
+###  Servlet 接口
+
+Servlet 规范接口,所有的Servlet必须实现 
+
++ public void init(ServletConfig config) throws ServletException;   
+  + 初始化方法,容器在构造servlet对象后,自动调用的方法,容器负责实例化一个ServletConfig对象,并在调用该方法时传入
+  + ServletConfig对象可以为Servlet 提供初始化参数
++ public ServletConfig getServletConfig();
+  + 获取ServletConfig对象的方法,后续可以通过该对象获取Servlet初始化参数
++ public void service(ServletRequest req, ServletResponse res) throws ServletException, IOException;
+  + 处理请求并做出响应的服务方法,每次请求产生时由容器调用
+  + 容器创建一个ServletRequest对象和ServletResponse对象,容器在调用service方法时,传入这两个对象
++ public String getServletInfo();
+  + 获取ServletInfo信息的方法
++ public void destroy();
+  + Servlet实例在销毁之前调用的方法
+
+### GenericServlet 抽象类
+
+GenericServlet 抽象类是对Servlet接口一些固定功能的粗糙实现,以及对service方法的再次抽象声明,并定义了一些其他相关功能方法
+
++ private transient ServletConfig config; 
+  + 初始化配置对象作为属性
++ public GenericServlet() { } 
+  + 构造器,为了满足继承而准备
++ public void destroy() { } 
+  + 销毁方法的平庸实现
++ public String getInitParameter(String name) 
+  + 获取初始参数的快捷方法
++ public Enumeration<String> getInitParameterNames() 
+  + 返回所有初始化参数名的方法
++ public ServletConfig getServletConfig()
+  +  获取初始Servlet初始配置对象ServletConfig的方法
++ public ServletContext getServletContext()
+  +  获取上下文对象ServletContext的方法
++ public String getServletInfo() 
+  + 获取Servlet信息的平庸实现
++ public void init(ServletConfig config) throws ServletException() 
+  + 初始化方法的实现,并在此调用了init的重载方法
++ public void init() throws ServletException 
+  + 重载init方法,为了让我们自己定义初始化功能的方法
++ public void log(String msg) 
++ public void log(String message, Throwable t)
+  +  打印日志的方法及重载
++ public abstract void service(ServletRequest req, ServletResponse res) throws ServletException, IOException; 
+  + 服务方法再次声明
++ public String getServletName() 
+  + 获取ServletName的方法
+
+### 自定义Servlet
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/1682299663047.png)
+
+自定义Servlet中,必须要对处理请求的方法进行重写
+
++ 要么重写service方法
++ 要么重写doGet/doPost方法
+
+##  ServletConfig和ServletContext
+
+### ServletConfig的使用
+
+> ServletConfig是什么
+
++ 为Servlet提供初始配置参数的一种对象,每个Servlet都有自己独立唯一的ServletConfig对象
++ 容器会为每个Servlet实例化一个ServletConfig对象,并通过Servlet生命周期的init方法传入给Servlet作为属性
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/1682302307081.png)
+
+> ServletConfig是一个接口,定义了如下API
+
+``` java
+package jakarta.servlet;
+import java.util.Enumeration;
+public interface ServletConfig {
+    String getServletName();
+    ServletContext getServletContext();
+    String getInitParameter(String var1);
+    Enumeration<String> getInitParameterNames();
+}
+```
+
+| 方法名                  | 作用                                                         |
+| ----------------------- | ------------------------------------------------------------ |
+| getServletName()        | 获取\<servlet-name>HelloServlet\</servlet-name>定义的Servlet名称 |
+| getServletContext()     | 获取ServletContext对象                                       |
+| getInitParameter()      | 获取配置Servlet时设置的『初始化参数』，根据名字获取值        |
+| getInitParameterNames() | 获取所有初始化参数名组成的Enumeration对象                    |
+
+> ServletConfig怎么用,测试代码如下
+
++ 定义Servlet
+
+``` java
+public class ServletA extends HttpServlet {
+    @Override
+    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        ServletConfig servletConfig = this.getServletConfig();
+        // 根据参数名获取单个参数
+        String value = servletConfig.getInitParameter("param1");
+        System.out.println("param1:"+value);
+        // 获取所有参数名
+        Enumeration<String> parameterNames = servletConfig.getInitParameterNames();
+        // 迭代并获取参数名
+        while (parameterNames.hasMoreElements()) {
+            String paramaterName = parameterNames.nextElement();
+            System.out.println(paramaterName+":"+servletConfig.getInitParameter(paramaterName));
+        }
+    }
+}
+
+
+
+public class ServletB extends HttpServlet {
+    @Override
+    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        ServletConfig servletConfig = this.getServletConfig();
+        // 根据参数名获取单个参数
+        String value = servletConfig.getInitParameter("param1");
+        System.out.println("param1:"+value);
+        // 获取所有参数名
+        Enumeration<String> parameterNames = servletConfig.getInitParameterNames();
+        // 迭代并获取参数名
+        while (parameterNames.hasMoreElements()) {
+            String paramaterName = parameterNames.nextElement();
+            System.out.println(paramaterName+":"+servletConfig.getInitParameter(paramaterName));
+        }
+    }
+}
+```
+
++ 配置Servlet
+
+``` xml
+  <servlet>
+       <servlet-name>ServletA</servlet-name>
+       <servlet-class>com.atguigu.servlet.ServletA</servlet-class>
+       <!--配置ServletA的初始参数-->
+       <init-param>
+           <param-name>param1</param-name>
+           <param-value>value1</param-value>
+       </init-param>
+       <init-param>
+           <param-name>param2</param-name>
+           <param-value>value2</param-value>
+       </init-param>
+   </servlet>
+
+    <servlet>
+        <servlet-name>ServletB</servlet-name>
+        <servlet-class>com.atguigu.servlet.ServletB</servlet-class>
+        <!--配置ServletB的初始参数-->
+        <init-param>
+            <param-name>param3</param-name>
+            <param-value>value3</param-value>
+        </init-param>
+        <init-param>
+            <param-name>param4</param-name>
+            <param-value>value4</param-value>
+        </init-param>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>ServletA</servlet-name>
+        <url-pattern>/servletA</url-pattern>
+    </servlet-mapping>
+
+    <servlet-mapping>
+        <servlet-name>ServletB</servlet-name>
+        <url-pattern>/servletB</url-pattern>
+    </servlet-mapping>
+```
+
++ 请求Servlet测试
+
+略
+
+### ServletContext的使用
+
+> ServletContext是什么
+
++ ServletContext对象有称呼为上下文对象,或者叫应用域对象(后面统一讲解域对象)
++ 容器会为每个app创建一个独立的唯一的ServletContext对象
++ ServletContext对象为所有的Servlet所共享
++ ServletContext可以为所有的Servlet提供初始配置参数
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/1682303205351.png)
+
+> ServletContext怎么用
+
++ 配置ServletContext参数
+
+``` xml
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-app_5_0.xsd"
+         version="5.0">
+
+    <context-param>
+        <param-name>paramA</param-name>
+        <param-value>valueA</param-value>
+    </context-param>
+    <context-param>
+        <param-name>paramB</param-name>
+        <param-value>valueB</param-value>
+    </context-param>
+</web-app>
+```
+
++ 在Servlet中获取ServletContext并获取参数
+
+``` java
+package com.atguigu.servlet;
+
+import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import java.io.IOException;
+import java.util.Enumeration;
+
+public class ServletA extends HttpServlet {
+    @Override
+    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+       
+        // 从ServletContext中获取为所有的Servlet准备的参数
+        ServletContext servletContext = this.getServletContext();
+        String valueA = servletContext.getInitParameter("paramA");
+        System.out.println("paramA:"+valueA);
+        // 获取所有参数名
+        Enumeration<String> initParameterNames = servletContext.getInitParameterNames();
+        // 迭代并获取参数名
+        while (initParameterNames.hasMoreElements()) {
+            String paramaterName = initParameterNames.nextElement();
+            System.out.println(paramaterName+":"+servletContext.getInitParameter(paramaterName));
+        }
+    }
+}
+```
+
+### ServletContext其他重要API
+
+> 获取资源的真实路径
+
+``` java
+String realPath = servletContext.getRealPath("资源在web目录中的路径");
+```
+
+> 获取项目的上下文路径
+
+``` java
+String contextPath = servletContext.getContextPath();
+```
+
++ 项目的部署名称,也叫项目的上下文路径,在部署进入tomcat时所使用的路径,该路径是可能发生变化的,通过该API动态获取项目真实的上下文路径,可以**帮助我们解决一些后端页面渲染技术或者请求转发和响应重定向中的路径问题**
+
+>  域对象的相关API
+
++ 域对象: 一些用于存储数据和传递数据的对象,传递数据不同的范围,我们称之为不同的域,不同的域对象代表不同的域,共享数据的范围也不同
++ ServletContext代表应用,所以ServletContext域也叫作应用域,是webapp中最大的域,可以在本应用内实现数据的共享和传递
++ webapp中的三大域对象,分别是应用域,会话域,请求域
++ `后续我们会将三大域对象统一进行讲解和演示`,三大域对象都具有的API如下
+
+| API                                         | 功能解释            |
+| ------------------------------------------- | ------------------- |
+| void setAttribute(String key,Object value); | 向域中存储/修改数据 |
+| Object getAttribute(String key);            | 获得域中的数据      |
+| void removeAttribute(String key);           | 移除域中的数据      |
+
+## HttpServletRequest
+
+###  HttpServletRequest简介
+
+> HttpServletRequest是什么
+
++ HttpServletRequest是一个接口,其父接口是ServletRequest
++ HttpServletRequest是Tomcat将请求报文转换封装而来的对象,在Tomcat调用service方法时传入
++ HttpServletRequest代表客户端发来的请求,所有请求中的信息都可以通过该对象获得
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/1681699577344.png)
+
+### HttpServletRequest常见API
+
+> HttpServletRequest怎么用
+
++ 获取请求行信息相关(方式,请求的url,协议及版本)
+
+| API                           | 功能解释                       |
+| ----------------------------- | ------------------------------ |
+| StringBuffer getRequestURL(); | 获取客户端请求的url            |
+| String getRequestURI();       | 获取客户端请求项目中的具体资源 |
+| int getServerPort();          | 获取客户端发送请求时的端口     |
+| int getLocalPort();           | 获取本应用在所在容器的端口     |
+| int getRemotePort();          | 获取客户端程序的端口           |
+| String getScheme();           | 获取请求协议                   |
+| String getProtocol();         | 获取请求协议及版本号           |
+| String getMethod();           | 获取请求方式                   |
+
++ 获得请求头信息相关
+
+| API                                   | 功能解释               |
+| ------------------------------------- | ---------------------- |
+| String getHeader(String headerName);  | 根据头名称获取请求头   |
+| Enumeration<String> getHeaderNames(); | 获取所有的请求头名字   |
+| String getContentType();              | 获取content-type请求头 |
+
++ 获得请求参数相关
+
+| API                                                     | 功能解释                             |
+| ------------------------------------------------------- | ------------------------------------ |
+| String getParameter(String parameterName);              | 根据请求参数名获取请求单个参数值     |
+| String[] getParameterValues(String parameterName);      | 根据请求参数名获取请求多个参数值数组 |
+| Enumeration<String> getParameterNames();                | 获取所有请求参数名                   |
+| Map<String, String[]> getParameterMap();                | 获取所有请求参数的键值对集合         |
+| BufferedReader getReader() throws IOException;          | 获取读取请求体的字符输入流           |
+| ServletInputStream getInputStream() throws IOException; | 获取读取请求体的字节输入流           |
+| int getContentLength();                                 | 获得请求体长度的字节数               |
+
++ 其他API
+
+| API                                          | 功能解释                    |
+| -------------------------------------------- | --------------------------- |
+| String getServletPath();                     | 获取请求的Servlet的映射路径 |
+| ServletContext getServletContext();          | 获取ServletContext对象      |
+| Cookie[] getCookies();                       | 获取请求中的所有cookie      |
+| HttpSession getSession();                    | 获取Session对象             |
+| void setCharacterEncoding(String encoding) ; | 设置请求体字符集            |
+
+## HttpServletResponse
+
+### HttpServletResponse简介
+
+> HttpServletResponse是什么
+
++ HttpServletResponse是一个接口,其父接口是ServletResponse
++ HttpServletResponse是Tomcat预先创建的,在Tomcat调用service方法时传入
++ HttpServletResponse代表对客户端的响应,该对象会被转换成响应的报文发送给客户端,通过该对象我们可以设置响应信息
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/1681699577344.png)
+
+###  HttpServletResponse的常见API
+
+> HttpServletRequest怎么用
+
++ 设置响应行相关
+
+| API                        | 功能解释       |
+| -------------------------- | -------------- |
+| void setStatus(int  code); | 设置响应状态码 |
+
+
++ 设置响应头相关
+
+| API                                                    | 功能解释                                         |
+| ------------------------------------------------------ | ------------------------------------------------ |
+| void setHeader(String headerName, String headerValue); | 设置/修改响应头键值对                            |
+| void setContentType(String contentType);               | 设置content-type响应头及响应字符集(设置MIME类型) |
+
++ 设置响应体相关
+
+| API                                                       | 功能解释                                                |
+| --------------------------------------------------------- | ------------------------------------------------------- |
+| PrintWriter getWriter() throws IOException;               | 获得向响应体放入信息的字符输出流                        |
+| ServletOutputStream getOutputStream() throws IOException; | 获得向响应体放入信息的字节输出流                        |
+| void setContentLength(int length);                        | 设置响应体的字节长度,其实就是在设置content-length响应头 |
+
++ 其他API
+
+| API                                                          | 功能解释                                            |
+| ------------------------------------------------------------ | --------------------------------------------------- |
+| void sendError(int code, String message) throws IOException; | 向客户端响应错误信息的方法,需要指定响应码和响应信息 |
+| void addCookie(Cookie cookie);                               | 向响应体中增加cookie                                |
+| void setCharacterEncoding(String encoding);                  | 设置响应体字符集                                    |
+
+> MIME类型
+
++ MIME类型,可以理解为文档类型,用户表示传递的数据是属于什么类型的文档
++ 浏览器可以根据MIME类型决定该用什么样的方式解析接收到的响应体数据
++ 可以这样理解: 前后端交互数据时,告诉对方发给对方的是 html/css/js/图片/声音/视频/... ...
++ tomcat/conf/web.xml中配置了常见文件的拓展名和MIMIE类型的对应关系
++ 常见的MIME类型举例如下
+
+| 文件拓展名                  | MIME类型               |
+| --------------------------- | ---------------------- |
+| .html                       | text/html              |
+| .css                        | text/css               |
+| .js                         | application/javascript |
+| .png /.jpeg/.jpg/... ...    | image/jpeg             |
+| .mp3/.mpe/.mpeg/ ... ...    | audio/mpeg             |
+| .mp4                        | video/mp4              |
+| .m1v/.m1v/.m2v/.mpe/... ... | video/mpeg             |
+
+# 请求转发和响应重定向
+
+## 概述
+
+> 什么是请求转发和响应重定向
+
++ 请求转发和响应重定向是web应用中间接访问项目资源的两种手段,也是Servlet控制页面跳转的两种手段
+
++ 请求转发通过HttpServletRequest实现,响应重定向通过HttpServletResponse实现
+
++ 请求转发生活举例: 张三找李四借钱,李四没有,李四找王五,让王五借给张三
++ 响应重定向生活举例:张三找李四借钱,李四没有,李四让张三去找王五,张三自己再去找王五借钱
+
+## 9.2 请求转发
+
+> 请求转发运行逻辑图
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/1682321228643.png)
+
+> 请求转发特点(背诵)
+
++ 请求转发通过HttpServletRequest对象获取请求转发器实现
++ 请求转发是服务器内部的行为,对客户端是屏蔽的
++ 客户端只发送了一次请求,客户端地址栏不变
++ 服务端只产生了一对请求和响应对象,这一对请求和响应对象会继续传递给下一个资源
++ 因为全程只有一个HttpServletRequset对象,所以请求参数可以传递,请求域中的数据也可以传递
++ 请求转发可以转发给其他Servlet动态资源,也可以转发给一些静态资源以实现页面跳转
++ 请求转发可以转发给WEB-INF下受保护的资源
++ 请求转发不能转发到本项目以外的外部资源
+
+> 请求转发测试代码
+
++ ServletA
+
+``` java
+@WebServlet("/servletA")
+public class ServletA extends HttpServlet {
+    @Override
+    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        //  获取请求转发器
+        //  转发给servlet  ok
+        RequestDispatcher  requestDispatcher = req.getRequestDispatcher("servletB");
+        //  转发给一个视图资源 ok
+        //RequestDispatcher requestDispatcher = req.getRequestDispatcher("welcome.html");
+        //  转发给WEB-INF下的资源  ok
+        //RequestDispatcher requestDispatcher = req.getRequestDispatcher("WEB-INF/views/view1.html");
+        //  转发给外部资源   no
+        //RequestDispatcher requestDispatcher = req.getRequestDispatcher("http://www.atguigu.com");
+        //  获取请求参数
+        String username = req.getParameter("username");
+        System.out.println(username);
+        //  向请求域中添加数据
+        req.setAttribute("reqKey","requestMessage");
+        //  做出转发动作
+        requestDispatcher.forward(req,resp);
+    }
+}
+```
+
++ ServletB
+
+``` java
+@WebServlet("/servletB")
+public class ServletB extends HttpServlet {
+    @Override
+    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        // 获取请求参数
+        String username = req.getParameter("username");
+        System.out.println(username);
+        // 获取请求域中的数据
+        String reqMessage = (String)req.getAttribute("reqKey");
+        System.out.println(reqMessage);
+        // 做出响应
+        resp.getWriter().write("servletB response");        
+    }
+}
+```
+
++ 打开浏览器,输入以下url测试
+
+``` http
+http://localhost:8080/web03_war_exploded/servletA?username=atguigu
+```
+
+## 响应重定向
+
+> 响应重定向运行逻辑图
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/1682322460011.png)
+
+> 响应重定向特点(背诵)
+
++ 响应重定向通过HttpServletResponse对象的sendRedirect方法实现
++ 响应重定向是服务端通过302响应码和路径,告诉客户端自己去找其他资源,是在服务端提示下的,客户端的行为
++ 客户端至少发送了两次请求,客户端地址栏是要变化的
++ 服务端产生了多对请求和响应对象,且请求和响应对象不会传递给下一个资源
++ 因为全程产生了多个HttpServletRequset对象,所以请求参数不可以传递,请求域中的数据也不可以传递
++ 重定向可以是其他Servlet动态资源,也可以是一些静态资源以实现页面跳转
++ 重定向不可以到给WEB-INF下受保护的资源
++ 重定向可以到本项目以外的外部资源
+
+> 响应重定向测试代码
+
++ ServletA
+
+``` java
+@WebServlet("/servletA")
+public class ServletA extends HttpServlet {
+    @Override
+    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        //  获取请求参数
+        String username = req.getParameter("username");
+        System.out.println(username);
+        //  向请求域中添加数据
+        req.setAttribute("reqKey","requestMessage");
+        //  响应重定向
+        // 重定向到servlet动态资源 OK
+        resp.sendRedirect("servletB");
+        // 重定向到视图静态资源 OK
+        //resp.sendRedirect("welcome.html");
+        // 重定向到WEB-INF下的资源 NO
+        //resp.sendRedirect("WEB-INF/views/view1");
+        // 重定向到外部资源
+        //resp.sendRedirect("http://www.atguigu.com");
+    }
+}
+```
+
++ ServletB
+
+``` java
+@WebServlet("/servletB")
+public class ServletB extends HttpServlet {
+    @Override
+    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        // 获取请求参数
+        String username = req.getParameter("username");
+        System.out.println(username);
+        // 获取请求域中的数据
+        String reqMessage = (String)req.getAttribute("reqKey");
+        System.out.println(reqMessage);
+        // 做出响应
+        resp.getWriter().write("servletB response");
+
+    }
+}
+```
+
++ 打开浏览器,输入以下url测试
+
+``` url
+http://localhost:8080/web03_war_exploded/servletA?username=atguigu
+```
+
+#   乱码问题
+
+> 乱码问题产生的根本原因是什么
+
+1. 数据的编码和解码使用的不是同一个字符集
+2. 使用了不支持某个语言文字的字符集
+
+> 各个字符集的兼容性
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/1682326867396.png)
+
++ 由上图得知,上述字符集都兼容了ASCII
++ ASCII中有什么? 英文字母和一些通常使用的符号,所以这些东西无论使用什么字符集都不会乱码
+
+###  HTML乱码问题
+
+> 设置项目文件的字符集要使用一个支持中文的字符集
+
++ 查看当前文件的字符集
+
++ 查看项目字符集 配置,将Global Encoding 全局字符集,Project Encoding 项目字符集, Properties Files 属性配置文件字符集设置为UTF-8
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/1682326229063.png)
+
+> 当前视图文件的字符集通过<meta charset="UTF-8"> 来告知浏览器通过什么字符集来解析当前文件
+
+``` html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    中文
+</body>
+</html>
+```
+
+### Tomcat控制台乱码
+
+> 在tomcat10.1.7这个版本中,修改 tomcat/conf/logging.properties中,所有的UTF-8为GBK即可
+
+> sout乱码问题,设置JVM加载.class文件时使用UTF-8字符集
+
++ 设置虚拟机加载.class文件的字符集和编译时使用的字符集一致
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/1695189588009.png)
+
+
+
+### 请求乱码问题
+
+####  GET请求乱码
+
+> GET请求方式乱码分析
+
++ GET方式提交参数的方式是将参数放到URL后面,如果使用的不是UTF-8,那么会对参数进行URL编码处理
++ HTML中的 <meta charset='字符集'/> 影响了GET方式提交参数的URL编码
++ tomcat10.1.7的URI编码默认为 UTF-8
++ 当GET方式提交的参数URL编码和tomcat10.1.7默认的URI编码不一致时,就会出现乱码
+
+> GET请求方式乱码演示
+
++ 浏览器解析的文档的<meta charset="GBK" /> 
+
++ GET方式提交时,会对数据进行URL编码处理 ,是将GBK 转码为 "百分号码"
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/1682385997927.png)
+
++ tomcat10.1.7 默认使用UTF-8对URI进行解析,造成前后端使用的字符集不一致,出现乱码
+
+> GET请求方式乱码解决
+
++ 方式1  :设置GET方式提交的编码和Tomcat10.1.7的URI默认解析编码一致即可 (推荐)
+
+![](https://zhuxiaoyi-1300958454.cos.ap-guangzhou.myqcloud.com/img/1682386298048.png)
+
++ 方式2 : 设置Tomcat10.1.7的URI解析字符集和GET请求发送时所使用URL转码时的字符集一致即可,修改conf/server.xml中 Connecter 添加 URIEncoding="GBK"  (不推荐)
+
+#### POST方式请求乱码
+
+> POST请求方式乱码分析
+
++ POST请求将参数放在请求体中进行发送
++ 请求体使用的字符集受到了<meta charset="字符集"/> 的影响
++ Tomcat10.1.7 默认使用UTF-8字符集对请求体进行解析
++ 如果请求体的URL转码和Tomcat的请求体解析编码不一致,就容易出现乱码
+
+> POST方式乱码演示
+
++ POST请求请求体受到了<meta charset="字符集"/> 的影响
+
++ 请求体中,将GBK数据进行 URL编码
+
++ 后端默认使用UTF-8解析请求体,出现字符集不一致,导致乱码
+
+> POST请求方式乱码解决
+
++ 方式1 : 请求时,使用UTF-8字符集提交请求体 (推荐)
+
++ 方式2 : 后端在获取参数前,设置解析请求体使用的字符集和请求发送时使用的字符集一致 (不推荐)
+
+### 响应乱码问题
+
+> 响应乱码分析
+
++ 在Tomcat10.1.7中,向响应体中放入的数据默认使用了工程编码 UTF-8
++ 浏览器在接收响应信息时,使用了不同的字符集或者是不支持中文的字符集就会出现乱码
+
+> 响应乱码演示
+
++ 服务端通过response对象向响应体添加数据
+
++ 浏览器接收数据解析乱码
+
+> 响应乱码解决
+
++ 方式1 : 手动设定浏览器对本次响应体解析时使用的字符集(不推荐)
+  + edge和 chrome浏览器没有提供直接的比较方便的入口,不方便
+
++ 方式2: 后端通过设置响应体的字符集和浏览器解析响应体的默认字符集一致(不推荐)
+
+方式3: 通过设置content-type响应头,告诉浏览器以指定的字符集解析响应体(推荐)
+
+# MVC架构模式
+
+```me
+1
+```
+
