@@ -1,1 +1,0 @@
-SpringBoot  整合  Spring+SpringMVC+MyBatis+MyBatisPlus+Druid +SpringAI+knf4ij+logback+Spring Security+redis+kafka+EFK+OpenFin+RAG智能客服+三级缓存  进⾏基础骨架项目学习开发

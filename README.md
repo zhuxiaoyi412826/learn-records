@@ -2264,7 +2264,43 @@ CanCommit→PreCommit→DoCommit，解决部分阻塞；依然有一致性问题
 
 **黑马程序员 天机学堂微服务版+ai agent  启动加自定义功能**
 
+# 脚本语言
+
+## python
+
+## javascripts
+
+## Groovy
+
+| 技术 / 组件 | 一句话作用                                                   | 典型场景                                                     |
+| ----------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| Groovy      | 运行在 JVM 上的动态脚本语言，兼容 Java 语法，可无缝调用 Java 类，语法简洁，支持静态 / 动态双模式，可编译为 class 字节码 | Gradle 构建脚本、Maven/Groovy 单元测试、DSL 脚本、快速原型、Jenkins Pipeline 脚本 |
+
 # 额外学习内容
+
+## JAVAFX
+
+> JavaFX 是 Java 生态跨平台桌面 GUI 框架，JDK11 后独立维护；支持 FXML+CSS 声明式界面，UI 操作必须在 UI 线程；用来开发 Windows/Mac/Linux 桌面客户端，作为 Swing 的替代方案。
+
+## Quarkus
+
+| 技术 / 组件 | 一句话作用                                                   | 典型场景                                                     |
+| ----------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| Quarkus     | 基于 Jakarta EE、MicroProfile 的云原生 Java/Kotlin 微服务框架，主打**原生镜像、极速启动、低内存占用**，兼容 Spring 生态，支持响应式编程 | 容器 / K8s 微服务、Serverless、FaaS，需要快速冷启动、资源受限的云环境 |
+
+## Micronaut
+
+| 技术 / 组件 | 一句话作用                                                   | 典型场景                                                    |
+| ----------- | ------------------------------------------------------------ | ----------------------------------------------------------- |
+| Micronaut   | 云原生 JVM 微服务框架，AOT 编译优先，**编译期注解处理**，无反射，支持 GraalVM 原生镜像，Java/Kotlin 双支持，命令式 + 响应式双编程模型 | K8s、Serverless、FaaS、轻量微服务，追求极小内存、毫秒级启动 |
+
+## Reactive Stack（Spring 响应式堆栈）
+
+> 一句话面试背诵：**Spring Reactive Stack 是 Spring 生态的一套全栈非阻塞异步开发体系，底层基于 Project Reactor，遵循 Reactive Streams 规范，支持背压，使用少量线程支撑大量并发连接；和传统 Servlet Stack（SpringMVC）是两套并行技术栈**
+
+**Reactor + WebFlux + R2DBC + Spring Security Reactive**
+
+> 这 4 个组件共同组成完整响应式后端链路：Project Reactor 是底层响应式 API；WebFlux 负责接收 HTTP 请求；R2DBC 是非阻塞数据库访问；Spring Security Reactive 提供响应式鉴权，整套全链路异步非阻塞、支持背压，属于 Reactive Stack
 
 ## Git-GitHupFlows-CI/CD
 

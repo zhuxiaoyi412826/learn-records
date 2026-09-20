@@ -1,5 +1,9 @@
 # 项目要求
 
+SpringBoot  整合  Spring+SpringMVC+MyBatis+MyBatisPlus+Druid +SpringAI+knf4ij+logback+Spring Security+redis+kafka+EFK+OpenFin+RAG智能客服+三级缓存  进⾏基础骨架项目学习开发
+
+
+
 1. 模型配置化
 
 - application.yml 配置模型 key、base‑url、模型名称，
@@ -37,14 +41,6 @@ token 消耗统计、账单报表
 6. **简易限流**：Sentinel 或者 Spring 内置限流，防止单用户疯狂刷大模型 API 产生高额账单
 
 ## 功能
-
-## 链路
-
-请求经拦截器 JWT 鉴权、Controller 做 DTO 参数校验，失败则全局异常返回 VO；校验通过进入 ServiceImpl，事务内保存用户提问、Redis 缓存会话，调用 LLM 并存储 AI 回复，Controller 组装 VO 返回，全局异常兜底。
-
-> 接收请求 → 拦截器执行登录鉴权 (JWT)（鉴权失败抛异常，全局异常直接返回 VO，不进入 Service）→ Controller 接收 DTO 入参 → DTO 参数校验（校验失败抛异常，全局异常直接返回 VO，不进入 Service）→ ServiceImpl 业务实现 → DO 实体数据处理 → Mapper 操作 MySQL 保存用户提问对话记录（开启事务）→ Redis 缓存会话信息 → 业务逻辑处理（组装对话上下文）→ 调用 LLM（LLM 调用失败抛出业务异常，全局异常兜底）→ Mapper 操作 MySQL 保存 AI 回复对话记录（事务提交）→ Service 返回业务数据 → Controller 组装 VO 出参返回结果，全局异常兜底
-
-## **性能**
 
 # 项目三层缓存
 

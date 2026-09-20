@@ -23,6 +23,8 @@ JDK21 LTS，SpringBoot4.1.x，Lombok，Logback，SpringAI 1.x，Maven。
 7. Maven pom.xml：所有依赖版本匹配SpringBoot4.1.x，SpringAI 1.x，Lombok，logback使用spring-boot自带starter，排除多余日志依赖
 8. 配置文件：application.yml，区分开发/生产环境application-dev.yml、application-prod.yml，生产环境调整日志级别
 9. 代码注释：类、核心方法添加JavaDoc注释；所有配置项写中文注释说明用途
+10.API运行流程 接收请求 → 参数校验 → 登录鉴权 (JWT) →会话管理 → 业务逻辑 → 调用数据库 → 返回结果，全局异常处理→ 返回前端渲染
+11.DTO 入参 VO出参 DO数据库实体
 
 ## 输出要求
 1. 输出完整目录结构 tree
@@ -30,7 +32,7 @@ JDK21 LTS，SpringBoot4.1.x，Lombok，Logback，SpringAI 1.x，Maven。
 3. 输出完整 logback-spring.xml 日志配置文件
 4. 依次输出各个Java类代码：统一返回、全局异常、AOP接口日志切面、SpringAI服务、Controller示例、实体类、配置类
 5. 输出yml配置文件
-6. 最后补充启动说明和日志文件说明
+6. 最后补充启动说明和日志文件说明还有README.md文件 .gitglone文件
 ```
 
 
