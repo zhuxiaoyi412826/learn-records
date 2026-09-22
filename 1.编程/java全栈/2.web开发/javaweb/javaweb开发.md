@@ -491,9 +491,42 @@ public class HelloServlet extends HttpServlet {
 
 ## 注解开发
 
+**替代 web.xml 里的 Servlet 注册配置**，把一个 Java 类标记为 Servlet，Tomcat 启动自动扫描注册。
+
 ```
 @WebServlet(name = "userServlet1", urlPatterns = "/userServlet1")
 ```
+
+**@MultipartConfig**
+
+> 作用：**开启 Servlet 文件上传支持**，解析`multipart/form-data`类型的表单（文件上传表单）。 Servlet3.0 + 新增，不加这个注解，`request.getPart()`拿不到上传文件。
+
+```
+@WebServlet("/upload")
+@MultipartConfig(
+    maxFileSize = 1024*1024*10, //单个文件最大10MB
+    maxRequestSize = 1024*1024*20, //整个请求最大20MB
+    fileSizeThreshold = 1024*1024 //超过1MB，文件写入临时磁盘，否则放内存
+)
+public class UploadServlet extends HttpServlet{
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        Part part = req.getPart("file"); //获取上传文件
+    }
+}
+```
+
+- **@WebServlet：注册 Servlet，绑定访问路径**
+- **@MultipartConfig：给这个 Servlet 开启文件上传解析能力**
+
+> 必须两个注解写在同一个 Servlet 类上。前端表单必须设置：`enctype="multipart/form-data"`
+
+| 参数                | 含义                                                 |
+| ------------------- | ---------------------------------------------------- |
+| `maxFileSize`       | 单个上传文件上限，-1 代表无限制                      |
+| `maxRequestSize`    | 一次 http 请求总大小上限（包含表单 + 所有文件）      |
+| `fileSizeThreshold` | 阈值：文件超过这个大小，写入临时文件；小于则存在内存 |
+| `location`          | 临时文件保存目录，默认 Tomcat 临时目录               |
 
 ## 生命周期
 
@@ -1077,6 +1110,36 @@ public class ServletB extends HttpServlet {
 http://localhost:8080/web03_war_exploded/servletA?username=atguigu
 ```
 
+# 拦截器/监听器
+
+## Filter（Servlet 过滤器）
+
+> 一句话：**JavaWeb 原生组件，在 Servlet 执行【之前 / 之后】拦截 HTTP 请求，属于 Servlet 规范，Tomcat 原生支持，不需要框架**。
+
+| 功能                    | 说明                                                     |
+| ----------------------- | -------------------------------------------------------- |
+| **编码统一设置**        | 统一设置 request 编码 UTF-8，避免中文乱码                |
+| **登录鉴权拦截**        | 未登录用户，直接拦截，重定向到登录页（你点餐项目用到的） |
+| **Cookie/Session 校验** | 读取 Cookie 拿到 SessionId，校验 Session 是否存在有效    |
+| **请求日志记录**        | 记录请求 IP、访问地址、请求时间                          |
+| **跨域处理 CORS**       | 统一添加响应头，处理跨域                                 |
+| **过滤非法参数**        | 拦截敏感词、非法请求参数                                 |
+| **压缩响应内容**        | 对 response 输出做 GZIP 压缩                             |
+| **资源权限控制**        | 静态资源（html/css/js）保护，未登录禁止访问              |
+| **防止 XSS 攻击**       | 对请求参数做过滤转义                                     |
+
+```mermaid
+flowchart TD
+Client[浏览器请求] --> F[Filter.doFilter]
+F -->|放行 chain.doFilter| S[Servlet执行]
+S -->|返回响应| F
+F -->返回[返回浏览器]
+```
+
+## Listener（Servlet 监听器）
+
+> 一句话：**Servlet 原生组件，监听 Web 容器内部事件，事件触发自动执行代码，不拦截请求，只做事件回调。** 和 Filter、Servlet 合称 JavaWeb 三大组件。
+
 #   乱码问题
 
 > 乱码问题产生的根本原因是什么
@@ -1202,9 +1265,238 @@ http://localhost:8080/web03_war_exploded/servletA?username=atguigu
 
 方式3: 通过设置content-type响应头,告诉浏览器以指定的字符集解析响应体(推荐)
 
+# Cookie + Session+token
+
+> 一句话：**Cookie 保存在浏览器（客户端）；Session 保存在服务器端；依靠 Cookie 存放 SessionId，实现无状态 HTTP 的会话保持。**
+
+## 1. Cookie
+
+- 存储位置：**浏览器客户端**
+- 本质：浏览器保存的一组键值对，随 HTTP 请求自动携带发给后端
+- 特点：
+  1. 大小有限（单个 Cookie 大约 4KB）
+  2. 可以设置过期时间：会话 Cookie（浏览器关闭就消失）/ 持久 Cookie
+  3. 不安全，用户可以查看、修改、删除
+  4. 只能存字符串，**不能存对象**
+
+```
+// 后端创建Cookie，返回给浏览器
+Cookie cookie = new Cookie("JSESSIONID", session.getId());
+cookie.setMaxAge(-1); // -1：会话Cookie，关闭浏览器失效
+resp.addCookie(cookie);
+```
+
+## 2. Session（HttpSession）
+
+- 存储位置：**服务器 (Tomcat) 内存**
+- 本质：服务器上的一块内存空间，可存 Object 对象（用户信息）
+- 每个 Session 有唯一标识：**SessionId**
+- 生命周期：
+  - 创建：用户第一次调用`request.getSession()`
+  - 销毁：超时、手动 invalidate ()、服务器关闭
+- 浏览器默认通过**Cookie 携带 JSESSIONID**，后端拿到 ID 找到对应 Session
+
+```
+// 获取session，存入登录用户
+HttpSession session = req.getSession();
+session.setAttribute("user",user);
+// 获取
+Object user = session.getAttribute("user");
+// 销毁（退出登录）
+session.invalidate();
+```
+
+## 3. token
+
+> Token 是身份凭证字符串（可放 Cookie/Header）
+
+**Token（如 JWT）**
+
+**自包含身份凭证字符串**，用户信息加密编码放在 Token 字符串本身。
+
+- 一般放在请求头 `Authorization: Bearer xxx`，也可以放进 Cookie
+- 服务端**不需要在内存保存会话数据**，解析 Token 本身就能拿到用户信息
+- 优点：天然适合分布式、前后端分离；无状态
+- 缺点：一旦签发，无法直接作废（很难注销）；不能存大量敏感信息
+
+| 项目         | Cookie+Session                      | Token(JWT)                         |
+| ------------ | ----------------------------------- | ---------------------------------- |
+| 身份凭证     | Cookie 携带 SessionId               | Token 字符串（Header/Cookie 传递） |
+| 用户数据存放 | **服务器 Session 内存**             | **Token 本身里面（payload）**      |
+| 服务端状态   | 有状态（需要保存 session）          | 无状态（不需要存会话）             |
+| 适用场景     | 传统 JavaWeb（你点餐项目，Servlet） | 前后端分离、移动端、微服务         |
+| 注销难度     | 简单：服务端销毁 session 即可       | 难，需要额外黑名单 / 过期时间控制  |
+| 跨域         | Cookie 受跨域、SameSite 限制        | Header 传 Token 跨域更灵活         |
+| 依赖         | 浏览器 Cookie 机制                  | 可脱离 Cookie，Header 传递         |
+
+## JWT（JSON Web Token）
+
+> 一句话：**自包含、带签名的 JSON 令牌，无状态，服务端不用存会话记录；只是签名防篡改，不是加密，payload 可直接解码查看**JSON Web T...
+
+三段式结构
+
+```
+Header.Payload.Signature
+```
+
+> ```
+> eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+> ```
+
+### 1. Header（头部，Base64Url 编码）
+
+```
+{
+  "alg": "HS256", // 签名算法 HS256(HMAC) / RS256(RSA非对称)
+  "typ": "JWT"
+}
+```
+
+- 作用：告诉后端用什么算法校验签名
+
+### 2. Payload（载荷 / 声明 Claims，Base64Url 编码）
+
+> ⚠️ **Base64 只是编码，不是加密！任何人都能解码看到内容，不能放密码、银行卡等敏感数据**
+
+1. 标准注册声明（推荐）
+   - `sub`：主题（用户 ID）
+   - `iat`：签发时间 issued at
+   - `exp`：过期时间 expiration（最常用）
+   - `iss`：签发者
+   - `aud`：受众
+2. 公共声明
+3. 私有声明（自定义，如`role:admin`）
+
+```
+{
+  "sub": "10001",
+  "name": "张三",
+  "role": "admin",
+  "iat": 1750000000,
+  "exp": 1750003600
+}
+```
+
+### 3. Signature（签名，核心防伪）
+
+生成逻辑：
+
+```
+Signature = HMAC-SHA256( base64Url(Header) + "." + base64Url(Payload), secret )
+```
+
+- HS256：**对称密钥**，签发和校验共用同一个密钥；简单，适合单体服务，密钥泄露则可伪造任意 JWT
+- RS256：**非对称 RSA**，私钥签发，公钥校验；适合微服务、OAuth2，公钥可以对外暴露
+
+> 校验：后端拿到 token，用同样算法 + 密钥重新计算签名，对比；不匹配说明内容被篡改，直接拒绝。
+
+### 完整登录鉴权流程
+
+1. 用户提交账号密码登录
+2. 后端校验账号密码，生成 JWT 返回前端
+3. 前端保存（LocalStorage / SessionStorage / HttpOnly Cookie）
+4. 后续请求，放在请求头 `Authorization: Bearer <jwt>`
+5. 后端： ① 校验签名 ② 校验 `exp` 是否过期 ✅ 通过就直接读取 payload 里的用户信息，**不需要查 Redis/DB 会话表**
+
+### ✅ JWT 优点
+
+1. **无状态**：服务端不存储会话，天然适配分布式、微服务集群，多节点不用同步 session
+2. 跨域友好，前后端分离、APP、小程序很适合
+3. 自带身份、权限信息，减少数据库查询
+4. 适合 SSO 单点登录
+
+### ❌ JWT 缺点（面试高频）
+
+1. **无法主动注销**：签发后直到 exp 过期前都有效；想要注销只能做黑名单（Redis 存作废 token），变回有状态，丧失一部分优势
+2. **payload 明文可解码，不能存敏感信息**
+3. Token 体积大，每次请求都携带，占用带宽；payload 内容越多越长
+4. 密钥泄露风险（HS256），攻击者可伪造任意 token
+5. 权限变更不能实时生效：用户权限修改，旧 JWT 里面的权限还是旧的，要等过期
+
+### 工程最佳实践
+
+1. 短有效期 Access JWT（5~15 分钟）
+
+   ，搭配
+
+   长时效 Refresh Token（一般 Opaque 随机串，存在 Redis，可随时吊销）
+
+   - Access 过期 → 用 RefreshToken 去换新 AccessToken
+
+2. 优先 RS256 非对称签名，避免 HS256 密钥泄露风险
+
+3. 不要把大量业务数据塞 payload，只放核心字段：userId、role
+
+4. 传输全程 HTTPS
+
+5. 若放前端 Storage：防 XSS；若放 HttpOnly Cookie：防 XSS 但要加 CSRF 防护
+
+## Opaque Token
+
+## API Key
+
+| 维度         | Opaque Token                                            | API Key（大模型密钥）                                 |
+| ------------ | ------------------------------------------------------- | ----------------------------------------------------- |
+| **设计目的** | 临时会话身份凭证，**短期有效**，代表「本次登录的用户」  | 长期静态凭证，代表**应用 / 开发者**，用于服务之间调用 |
+| **生命周期** | 短，Access Token 几分钟；Refresh Token 最多几天，会轮换 | 可以长期不变，除非手动删除 / 轮换                     |
+| **权限模型** | 代表**登录用户**，权限随用户动态变化                    | 代表**项目 / 开发者账号**，权限绑定密钥本身           |
+| **使用场景** | 用户登录态，人操作（SPA/App 登录）                      | 机器对机器调用，程序直接调用 API                      |
+| **过期策略** | 自带 TTL，到期自动失效                                  | 默认不会自动过期，需要人工回收                        |
+| **协议归属** | OAuth2/OIDC 令牌体系                                    | 不属于 OAuth，只是自定义鉴权密钥                      |
+
+## AccessToken + RefreshToken
+
+绝大多数互联网业务现在是：**AccessToken + RefreshToken 双令牌模型**，这是行业标准。
+
+| 角色                     | 令牌选型                   | 存放位置                                  | 有效期                      |
+| ------------------------ | -------------------------- | ----------------------------------------- | --------------------------- |
+| AccessToken（业务鉴权）  | 二选一：JWT / Opaque Token | 前端内存 / LocalStorage / HttpOnly Cookie | 很短：**5～15 分钟**        |
+| RefreshToken（刷新凭证） | **几乎固定 Opaque Token**  | HttpOnly Cookie（推荐）                   | 较长：7 天、14 天，支持吊销 |
+
+### 完整流程
+
+1. 用户输入账号密码登录，后端校验成功
+2. 返回：`Access` + `Refresh`
+3. 前端调用业务接口，携带 `AccessToken` 鉴权
+4. Access 过期 → 前端用 RefreshToken 请求接口，换取新 Access
+5. 登出：后端直接删除 Redis 里的 RefreshToken（**立刻失效**）
+
+> 选型细节：
+>
+> - 中小单体项目：AccessToken 用 **JWT**（不用每次查 Redis，省事）
+> - 金融、高安全系统：AccessToken 也用 **Opaque Token**，每次 Redis 查询，支持随时吊销
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Backend
+    participant Redis
+    User->>Frontend: 输入账号密码
+    Frontend->>Backend: 登录请求
+    Backend->>Redis: 存入RefreshToken(Opaque)
+    Backend-->>Frontend: 返回 AccessToken(JWT) + RefreshToken
+    Frontend->>Backend: 业务请求带上AccessToken
+    Backend-->>Frontend: 正常返回数据
+    Note over Frontend: Access过期，收到401
+    Frontend->>Backend: /refresh 带上RefreshToken
+    Backend->>Redis: 查询RefreshToken是否存在
+    Redis-->>Backend: 有效
+    Backend-->>Frontend: 返回新AccessToken
+    Frontend->>Backend: 继续业务请求
+    User->>Frontend: 点击登出
+    Frontend->>Backend: 登出请求
+    Backend->>Redis: 删除RefreshToken
+```
+
+
+
 # MVC架构模式
 
 ```me
 1
 ```
 
+# MinIO
+
+# TomCat10
