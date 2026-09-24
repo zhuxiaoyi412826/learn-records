@@ -16,6 +16,16 @@ https://github.com/spring-projects/spring-framework.git  5.3X源码
 
 现在是spring
 
+
+
+**SSM 三个 xml 分工（千万别搞混）**
+
+| 文件                   | 位置      | 负责内容                                         |
+| ---------------------- | --------- | ------------------------------------------------ |
+| web.xml                | WEB-INF   | Tomcat 容器配置：注册监听器、Servlet、Filter     |
+| applicationContext.xml | resources | Spring：数据源、事务、Service、MyBatis           |
+| springmvc.xml          | resources | SpringMVC：Controller 扫描、视图解析器、静态资源 |
+
 ## 什么是Spring
 
 Spring是一款轻量级且功能强大的框架 他的优势是在简化开发和框架整合上
@@ -69,7 +79,150 @@ applicationCentext.xml
 </beans>
 ```
 
+## 配置文件
 
+> 两种模式：**半注解（保留 xml，企业老项目主流）**、**全注解无 xml**
+
+### 一、半注解模式（保留 xml，面试最常考）
+
+表格
+
+| 文件                                | 位置                | 作用                 | 核心内容                                                     |
+| ----------------------------------- | ------------------- | -------------------- | ------------------------------------------------------------ |
+| `web.xml`                           | `WEB-INF/web.xml`   | Tomcat 部署描述符    | 注册监听器、DispatcherServlet、编码 Filter，**告诉 Tomcat 怎么启动 Spring 容器** |
+| `applicationContext.xml`            | `resources/`        | Spring 父容器配置    | 扫描`@Service/@Repository`、加载`properties`、数据源、MyBatis、事务 |
+| `springmvc.xml`                     | `resources/`        | SpringMVC 子容器配置 | 扫描`@Controller`、视图解析器、静态资源放行、消息转换器      |
+| `config.properties/jdbc.properties` | `resources/`        | 属性配置文件         | 数据库 url、账号密码等参数，被 xml 读取                      |
+| `mybatis-config.xml`（可选）        | `resources/`        | MyBatis 全局配置     | 驼峰命名、日志、别名（很多项目直接在 Spring 中整合，可省略） |
+| Mapper 映射文件 `*.xml`             | `resources/mapper/` | MyBatisSQL 映射      | 写 SQL 语句                                                  |
+
+### 启动顺序回顾
+
+Tomcat → web.xml → 加载 applicationContext（父容器，Service/DAO）→ 加载 springmvc.xml（子容器，Controller）
+
+### 二、全注解模式（**全部 xml 删除**，现代 SSM 写法）
+
+不再有：`web.xml`、`applicationContext.xml`、`springmvc.xml` 需要 Java 配置类 + properties：
+
+1. `WebConfig.java` 实现`WebApplicationInitializer` → **替代 web.xml**
+2. `SpringRootConfig.java`（`@Configuration`）→ **替代 applicationContext.xml**
+3. `SpringMvcConfig.java`（`@Configuration`）→ **替代 springmvc.xml**
+4. `config.properties` → 属性文件（保留，存放数据库配置）
+5. `mybatis-config.xml`（可选）、Mapper.xml
+6. `RootConfig.java` → **替代** spring.xml
+
+## WEB.XML
+
+> SSM = Spring + SpringMVC + MyBatis，**war 包部署到外部 Tomcat**，依赖`WEB-INF/web.xml`，是 Servlet 规范部署描述文件，Tomcat 启动第一件事就读这个文件。
+>
+> SSM 项目的`web.xml`是**Tomcat 的配置文件**，用来告诉 Tomcat 启动时加载 Spring 容器、注册 SpringMVC 核心 Servlet、注册全局过滤器，是 SSM 项目 war 包部署的入口
+
+### 一、web.xml 在 SSM 里 4 大核心组件
+
+| 组件                    | 类                                                       | 作用                                                         |
+| ----------------------- | -------------------------------------------------------- | ------------------------------------------------------------ |
+| ContextLoaderListener   | `org.springframework.web.context.ContextLoaderListener`  | **启动 Spring 父容器**，加载`applicationContext.xml`，管理 Service、Mapper、DataSource、事务 |
+| contextConfigLocation   | 上下文参数                                               | 指定 Spring 核心配置文件路径                                 |
+| DispatcherServlet       | `org.springframework.web.servlet.DispatcherServlet`      | SpringMVC 前端控制器，**SpringMVC 子容器**，加载`springmvc.xml`，管理 Controller |
+| CharacterEncodingFilter | `org.springframework.web.filter.CharacterEncodingFilter` | 全局编码过滤器，统一请求为 UTF-8，解决 POST 乱码             |
+
+> ✅ 父子容器重点（面试高频）
+>
+> 1. ContextLoaderListener 创建**父容器（Spring）**
+> 2. DispatcherServlet 创建**子容器（SpringMVC）**
+> 3. 子容器能拿到父容器 Bean；父容器拿不到子容器 Bean
+> 4. 父子容器 Bean 隔离，防止冲突
+
+### 二、SSM 标准 web.xml 完整代码
+
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee
+         shturl.cc/cuwlOJRzgS6AzPwQoZbjIakPkLjqDaoXxWRjVvPi"
+         version="4.0">
+
+    <!-- ========== 1. Spring父容器配置（Service、MyBatis、数据源） ========== -->
+    <context-param>
+        <param-name>contextConfigLocation</param-name>
+        <param-value>classpath:applicationContext.xml</param-value>
+    </context-param>
+    <!-- 监听器：项目启动，自动加载Spring容器 -->
+    <listener>
+        <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+    </listener>
+
+    <!-- ========== 2. SpringMVC 前端控制器 DispatcherServlet ========== -->
+    <servlet>
+        <servlet-name>springmvc</servlet-name>
+        <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+        <!-- 指定SpringMVC配置文件 -->
+        <init-param>
+            <param-name>contextConfigLocation</param-name>
+            <param-value>classpath:springmvc.xml</param-value>
+        </init-param>
+        <!-- load-on-startup: >0 项目启动就实例化，不等到第一次访问 -->
+        <load-on-startup>1</load-on-startup>
+    </servlet>
+    <!-- / 代表拦截所有请求，不包含jsp；/* 会拦截jsp，慎用 -->
+    <servlet-mapping>
+        <servlet-name>springmvc</servlet-name>
+        <url-pattern>/</url-pattern>
+    </servlet-mapping>
+
+    <!-- ========== 3. 全局编码过滤器，必须放在最前面 ========== -->
+    <filter>
+        <filter-name>encodingFilter</filter-name>
+        <filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
+        <init-param>
+            <param-name>encoding</param-name>
+            <param-value>UTF-8</param-value>
+        </init-param>
+        <init-param>
+            <param-name>forceEncoding</param-name>
+            <param-value>true</param-value>
+        </init-param>
+    </filter>
+    <filter-mapping>
+        <filter-name>encodingFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
+</web-app>
+```
+
+### 三、Tomcat 启动顺序（SSM 核心流程）
+
+1. Tomcat 加载项目，读取`web.xml`
+2. 先加载`<context-param>`参数
+3. 触发`ContextLoaderListener` → 解析`applicationContext.xml`，**创建 Spring 父 IOC 容器**，实例化 DataSource、Service、Mapper
+4. 实例化 Filter（编码过滤器）
+5. 实例化 DispatcherServlet（因为`load-on-startup=1`）→ 加载`springmvc.xml`，**创建 SpringMVC 子容器**，扫描 Controller
+6. 等待浏览器请求，请求进入 Tomcat → 经过 Filter → 交给 DispatcherServlet 分发
+
+### 四、常见坑（SSM 开发高频）
+
+1. `url-pattern`写`/*`：会拦截 JSP 页面，导致页面 404，SSM 一般写`/`
+
+2. 忘记`forceEncoding=true`：GET 请求编码失效
+
+3. 父子容器重复扫描包：如果
+
+   ```
+   applicationContext.xml
+   ```
+
+   也扫描 Controller，会出现 Bean 重复，引发各种异常
+
+   - 父容器：只扫描`@Service @Mapper`
+   - 子容器：只扫描`@Controller`
+
+4. 删掉 ContextLoaderListener：Spring 容器不会初始化，Service 注入失败空指针
+
+## config.properties
+
+> SSM 项目中 `config.properties` 是属性配置文件，专门放键值对（数据库地址、账号密码、端口等），不能替代 `applicationContext.xml` / Spring 配置类，它只是**外部属性资源**。
 
 ## Demo
 
@@ -783,21 +936,15 @@ public class SpringConfig {
 
 ## AOP
 
-AOP核心概念
+### AOP核心概念
 
-目标对象(Target)：原始功能去掉共性功能对应的类产生的对象，这种对象是无法直接完成最终 工作的 
+> 目标对象(Target)：原始功能去掉共性功能对应的类产生的对象，这种对象是无法直接完成最终 工作的 
+>
+> 代理(Proxy)：目标对象无法直接完成工作，需要对其进行功能回填，通过原始对象的代理对象实现
+>
+> SpringAOP是在不改变原有设计(代码)的前提下对其进行增强的，它的底层采用的是代理模式实现 的，所以要对原始对象进行增强，就需要对原始对象创建代理对象，在代理对象中的方法把通知
 
-代理(Proxy)：目标对象无法直接完成工作，需要对其进行功能回填，通过原始对象的代理对象实 现
-
-SpringAOP是在不改变原有设计(代码)的前提下对其进行增强的，它的底层采用的是代理模式实现 的，所以要对原始对象进行增强，就需要对原始对象创建代理对象，在代理对象中的方法把通知
-
-
-
-
-
-
-
-AOP(Aspect Oriented Programming)面向切面编程，一种编程范式，
+### **AOP(Aspect Oriented Programming)面向切面编程**
 
 AOP中核心概念分别指的是什么? 连接点 切入点 通知 通知类 切面
 
@@ -809,9 +956,7 @@ AOP中核心概念分别指的是什么? 连接点 切入点 通知 通知类 �
 
  (4)通知是要增强的内容，会有多个，切入点是需要被增强的方法，也会有多个，那哪个切入点需要添 加哪个通知，就需要提前将它们之间的关系描述清楚，那么对于通知和切入点之间的关系描述，我们 给起了个名字叫**切面** 
 
-(5)通知是一个方法，方法不能独立存在需要被写在一个类中，这个类我们也给起了个名字叫**通知类**
-
-**@Repository**
+(5)通知是一个方法，方法不能独立存在需要被写在一个类中，这个类我们也给起了个名字叫**通知类**@Repository
 
 ### demo
 
@@ -876,13 +1021,7 @@ public class MyAdvice {
 }
 ```
 
-
-
-
-
-
-
-
+### 注解实现
 
 @EnableAspectJAutoproxy  在spring的配置类上开启AOP功能
 
@@ -896,56 +1035,46 @@ public class MyAdvice {
 
 @Before    也就是说通知会在切入点方法执行之前执行
 
-![](C:\Users\DELL\AppData\Roaming\Typora\typora-user-images\image-20230207143442821.png)
-
-```
- execution(public User com.itheima.service.UserService.findById(int))
-```
-
-AOP切入点表达式  分别是语法格式、通配符和书写技巧。
-
-execution：动作关键字，描述切入点的行为动作，例如execution表示执行到指定切入点
-
- public:访问修饰符,还可以是public，private等，可以省略
-
- User：返回值，写返回值类型 com.itheima.service：
-
-包名，多级包使用点连接 UserService:类/接口名称
-
- findById：方法名 
-
-int:参数，直接写参数的类型，多个类型用逗号隔开 异常名：方法定义中抛出指定异常，可以省略
-
-\* :单个独立的任意符号，可以独立出现，也可以作为前缀或者后缀的匹配符出现 匹配com.itheima包下的任意包中的UserService类或接口中所有find开头的带有一个参数的 方法 
-
-..：多个连续的任意符号，可以独立出现，常用于简化包名与参数的书写 匹配com包下的任意包中的UserService类或接口中所有名称为findById的方法
-
- +：专用于匹配子类类型 这个使用率较低，描述子类的，咱们做JavaEE开发，继承机会就一次，使用都很慎重，所以很少 用它。*Service+，表示所有以Service结尾的接口的子类。
-
-通知类型
-
-(1)前置通知，追加功能到方法执行前,类似于在代码1或者代码2添加内容 
-
-(2)后置通知,追加功能到方法执行后,不管方法执行的过程中有没有抛出异常都会执行，类似于在代 码5添加内容
-
- (3)返回后通知,追加功能到方法执行后，只有方法正常执行结束后才进行,类似于在代码3添加内容， 如果方法执行抛出异常，返回后通知将不会被添加
-
- (4)抛出异常后通知,追加功能到方法抛出异常后，只有方法执行出异常才进行,类似于在代码4添加内 容，只有方法抛出异常后才会被添加 
-
-(5)环绕通知,环绕通知功能比较强大，它可以追加功能到方法执行的前后，这也是比较常用的方式， 它可以实现其他四种通知类型的功能，具体是如何实现的，需要我们往下学习。
 
 
 
-1环绕通知必须依赖形参ProceedingJoinPoint才能实现对原始方法的调用，进而实现原始方法 调用前后同时添加通知 
 
-2. 通知中如果未使用ProceedingJoinPoint对原始方法进行调用将跳过原始方法的执行 
-3. 对原始方法的调用可以不接收返回值，通知方法设置成void即可，如果接收返回值，最好设定为 Object类型 
-4. 原始方法的返回值如果是void类型，通知方法的返回值类型可以设置成void,也可以设置成 Object 
-5. 由于无法预知原始方法运行后是否会抛出异常，因此环绕通知方法必须要处理Throwable异常
+**知识点1：@EnableAspectJAutoProxy**  
 
+| 名称 | @EnableAspectJAutoProxy |
+| ---- | ----------------------- |
+| 类型 | 配置类注解              |
+| 位置 | 配置类定义上方          |
+| 作用 | 开启注解格式AOP功能     |
 
+**知识点2：@Aspect**
 
-获取切入点方法的参数，所有的通知类型都可以获取参数 JoinPoint：适用于前置、后置、返回后、抛出异常后通知 ProceedingJoinPoint：适用于环绕通知 获取切入点方法返回值，前置和抛出异常后通知是没有返回值，后置通知可有可无，所以不做研究 返回后通知 环绕通知 获取切入点方法运行异常信息，前置和返回后通知是不会有，后置通知可有可无，所以不做研究 抛出异常后通知 环绕通知
+| 名称 | @Aspect               |
+| ---- | --------------------- |
+| 类型 | 类注解                |
+| 位置 | 切面类定义上方        |
+| 作用 | 设置当前类为AOP切面类 |
+
+**知识点3：@Pointcut**   
+
+| 名称 | @Pointcut                   |
+| ---- | --------------------------- |
+| 类型 | 方法注解                    |
+| 位置 | 切入点方法定义上方          |
+| 作用 | 设置切入点方法              |
+| 属性 | value（默认）：切入点表达式 |
+
+**知识点4：@Before**
+
+| 名称 | @Before                                                      |
+| ---- | ------------------------------------------------------------ |
+| 类型 | 方法注解                                                     |
+| 位置 | 通知方法定义上方                                             |
+| 作用 | 设置当前通知方法与切入点之间的绑定关系，当前通知方法在原始切入点方法前运行 |
+
+### AOP工作流程
+
+### AOP配置管理
 
 ## 事务管理
 
@@ -956,6 +1085,18 @@ spring事务属性
 # SpringMVC
 
 # SSM整合
+
+> SSM = Spring (业务 + IOC + 事务) + SpringMVC (web 层、控制器) + MyBatis (持久层) 环境：JDK8，Maven3.6+，Tomcat9，MySQL8，IDEA；做简单用户 CRUD 演示
+
+
+
+
+
+
+
+
+
+
 
 # SPringAI
 
@@ -975,255 +1116,3 @@ spring事务属性
 
 
 
-# 什么是 Spring Data JPA？
-
-用最简单的话讲：**Spring Data JPA 是 Spring 提供的一套简化数据库操作的框架，它基于 JPA 规范，让你不用写繁琐的 JDBC/MyBatis 代码，几乎只需要定义接口，就能自动实现增删改查、分页、排序等功能。**
-
-它的核心价值：**告别重复的数据库操作代码，极大提升开发效率**。
-
-------
-
-## 先搞懂两个基础概念
-
-1. **JPA**
-
-   全称 Java Persistence API（Java 持久化 API），**是一套规范（接口 / 标准）**，不是具体实现。
-
-   它规定了 Java 对象和数据库表映射、操作数据库的标准规则。
-
-   常见实现：Hibernate（Spring Data JPA 默认用它）、EclipseLink。
-
-   
-
-2. **Spring Data**
-
-   Spring 的一个大家族项目，统一对各种数据源（关系型数据库、Redis、MongoDB 等）提供**简化的数据访问层**。
-
-   Spring Data JPA 就是它针对**关系型数据库 + JPA** 的子项目。
-
-   
-
-------
-
-## Spring Data JPA 核心特点
-
-1. 无需写实现类
-
-   
-
-   只需要定义一个
-
-   接口
-
-   ，继承 JpaRepository，自动拥有全套 CRUD 方法。
-
-2. 方法名自动生成 SQL
-
-   
-
-   按照规则写方法名（比如 
-
-   ```
-   findByNameAndAge
-   ```
-
-   ），框架自动生成 SQL，不用手写。
-
-3. 支持自定义 SQL
-
-   
-
-   复杂查询用 
-
-   ```
-   @Query
-   ```
-
-    注解直接写 JPQL 或原生 SQL。
-
-4. 自带分页、排序、批量操作
-
-   
-
-   开箱即用，不用自己封装工具类。
-
-5. 与 Spring Boot 无缝整合
-
-   
-
-   极少配置，直接开发。
-
-------
-
-## 最直观的代码示例（Spring Boot）
-
-### 1. 引入依赖（Maven）
-
-xml
-
-
-
-
-
-
-
-
-
-```
-<!-- Spring Data JPA -->
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-data-jpa</artifactId>
-</dependency>
-<!-- 数据库驱动（以MySQL为例） -->
-<dependency>
-    <groupId>com.mysql</groupId>
-    <artifactId>mysql-connector-j</artifactId>
-    <scope>runtime</scope>
-</dependency>
-```
-
-### 2. 实体类（映射数据库表）
-
-用注解标注对象和表的关系：
-
-java
-
-
-
-运行
-
-
-
-
-
-
-
-```
-@Entity // 标识这是一个JPA实体类
-@Table(name = "t_user") // 对应数据库表名
-public class User {
-    @Id // 主键
-    @GeneratedValue(strategy = GenerationType.IDENTITY) // 自增
-    private Long id;
-    
-    private String name;
-    private Integer age;
-    
-    // getter、setter、构造器
-}
-```
-
-### 3. Dao 层接口（核心！）
-
-**只写接口，不写实现类**：
-
-java
-
-
-
-运行
-
-
-
-
-
-
-
-```
-// 继承 JpaRepository<实体类, 主键类型>
-public interface UserRepository extends JpaRepository<User, Long> {
-
-    // 方法名自动生成 SQL：SELECT * FROM t_user WHERE name = ?
-    User findByName(String name);
-    
-    // 自动生成：SELECT * FROM t_user WHERE age > ?
-    List<User> findByAgeGreaterThan(Integer age);
-}
-```
-
-### 4. 直接使用
-
-java
-
-
-
-运行
-
-
-
-
-
-
-
-```
-@Service
-public class UserService {
-    @Autowired
-    private UserRepository userRepository;
-
-    public void test() {
-        // 1. 新增/保存
-        userRepository.save(new User("张三", 20));
-        
-        // 2. 查询所有
-        List<User> all = userRepository.findAll();
-        
-        // 3. 根据ID查询
-        User user = userRepository.findById(1L).orElse(null);
-        
-        // 4. 自定义方法查询
-        User zhangsan = userRepository.findByName("张三");
-        
-        // 5. 分页查询
-        Page<User> page = userRepository.findAll(PageRequest.of(0, 10));
-        
-        // 6. 删除
-        userRepository.deleteById(1L);
-    }
-}
-```
-
-------
-
-## Spring Data JPA 解决了什么痛点？
-
-- 不用写 `JDBC` 的 `Connection`、`PreparedStatement`、结果集封装
-- 不用像 MyBatis 那样写 XML 或注解 SQL（简单查询完全不用）
-- 不用自己封装分页、排序、批量操作工具
-- 统一数据访问层代码风格，维护成本极低
-
-------
-
-## 适用场景
-
-- 快速开发中小型项目
-- 单表 / 简单关联查询居多的业务
-- 不想写大量重复 SQL 的场景
-
-**不适合**：极其复杂的多表关联查询、存储过程重度使用（这种场景更适合 MyBatis）。
-
-------
-
-### 总结
-
-1. **Spring Data JPA = Spring 对 JPA 的封装 + 简化数据操作**
-2. 核心：**定义接口 → 继承父接口 → 直接用方法**，零实现
-3. 底层默认实现是 **Hibernate**
-4. 优势：开发极快、代码极简、适合快速开发
-
-
-
-# Micrometer
-
-**Micrometer 是 Java 应用指标采集门面框架，类比指标界的 SLF4J；SpringBoot2+ Actuator 默认集成，用来采集业务 / 系统指标，可对接 Prometheus、Datadog 等监控系统**
-
-# Spring Cloud Alibaba
-
-# Spring WebFlux
-
-1. **Spring WebFlux 底层就是 Project Reactor**，接口返回 `Mono<Resp>` / `Flux<Msg>`
-2. **R2DBC 响应式数据库驱动** 返回 Mono/Flux
-3. SpringBoot3 响应式栈默认就是 Reactor
-
-**Project Reactor**

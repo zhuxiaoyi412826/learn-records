@@ -1,8 +1,12 @@
 # AI 生成生产级项目 · 固定提示词模板
 
+**JDK21 LTS，SpringBoot4.1.x，Lombok，Logback，SpringAI 1.x，Maven。**
+**springsercurity knf4ij SeaweedFS 前后端缓存本地缓存 后端L1-L2-L3缓存  Redis MySQL8.X**
+
 ```
 请生成一个生产级SpringBoot4.1.x项目模板，严格遵循RESTful接口规范，技术栈：
 JDK21 LTS，SpringBoot4.1.x，Lombok，Logback，SpringAI 1.x，Maven。
+springsercurity
  Druid2.x数据源
 ## 核心要求
 1. 项目结构：标准分层架构 controller / service / mapper / entity / config / exception / util
