@@ -3,6 +3,56 @@
 **JDK21 LTS，SpringBoot4.1.x，Lombok，Logback，SpringAI 1.x，Maven。**
 **springsercurity knf4ij SeaweedFS 前后端缓存本地缓存 后端L1-L2-L3缓存  Redis MySQL8.X**
 
+
+
+## 需求梳理（Logback 配置，SpringBoot）
+
+> 技术选型：**logback‑spring.xml**（SpringBoot 默认日志框架）
+
+### ✅ 用户需求清单
+
+1. **控制台输出级别改为 DEBUG**；控制台日志**同时也输出到 DEBUG.log**
+
+2. 文件路径根目录：
+
+   ```
+   D:\rizi1\qiangpiao\
+   ```
+
+   - `DEBUG.log`：**程序重启直接清空文件（每次启动覆盖，不追加）**；输出 DEBUG 及以上日志；同时镜像控制台全部输出
+
+3. 按每日滚动分割日志： 
+
+   但是当天不显示日期还是 error.log info.log warn.log  归档的显示日期
+
+   - `error‑yyyy‑MM‑dd.log`：**只输出 ERROR 级别日志**
+   - `info‑yyyy‑MM‑dd.log`：**只输出 INFO 级别日志**
+   - `warn‑yyyy‑MM‑dd.log`：**只输出 WARN 级别日志**
+
+4. 慢 SQL 单独日志目录 
+
+   ```
+   D:\rizi1\qiangpiao\SQL\
+   ```
+
+   - SQL 执行耗时＞**100ms**单独输出到此目录；单独慢 sql 日志文件，按日滚动
+
+5. 额外补充考虑点（生产建议补充）
+
+   - 日志保留天数 30天
+   - 文件大小保护，防止单日日志过大  100mb
+   - 异步输出，不阻塞业务线程
+   - appender 过滤严格级别（精准隔离 error /info/warn，不能交叉输出）
+   - 根 logger 级别设置；mybatis 慢 SQL 拦截输出
+   - 区分开发、生产；禁止重复打印日志（additivity 设置）
+
+> ⚠️重点说明：
+>
+> - DEBUG.log：**重启清空（FileAppender，不滚动，每次启动覆盖原有文件）**
+> - error/info/warn/ 慢 SQL：**TimeBasedRollingPolicy 按日期分割滚动，保留历史文件，不会重启删除旧日志**
+>
+> 
+
 ```
 请生成一个生产级SpringBoot4.1.x项目模板，严格遵循RESTful接口规范，技术栈：
 JDK21 LTS，SpringBoot4.1.x，Lombok，Logback，SpringAI 1.x，Maven。

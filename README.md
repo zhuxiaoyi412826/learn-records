@@ -506,13 +506,13 @@
 
 ## 前端基础
 
-#### 2.1 HTML5 & CSS3
+#### HTML5 & CSS3
 
 - HTML5 语义化标签、Canvas、Web Storage、Web Worker
 - CSS3 选择器、Flexbox、Grid 布局、动画（transition/animation）、响应式设计
 - CSS 预处理器：Less / Sass（选一个）
 
-#### 2.2 JavaScript 深入
+#### JavaScript 
 
 - 原型与原型链、闭包、作用域链、this 指向
 - ES6+ 新特性：let/const、箭头函数、解构赋值、Promise、async/await、模块化 import/export、Map/Set、Proxy/Reflect、Symbol
@@ -622,8 +622,6 @@ TS
 - **容器资源限制 CPU / 内存、容器隔离 namespace/cgroups**
 -  **镜像安全、多阶段构建减小镜像体积**
 
-
-
 ## 后台三大组件
 
 **Servlet**
@@ -657,79 +655,6 @@ TS
 - [Swagger](https://github.com/swagger-api/swagger-ui)/[Knife4](https://github.com/xiaoymin/knife4j): OpenAPI 规范的 UI 渲染工具，用来可视化展示、在线调试文档，统一返回码、参数校验、接口限流、版本控制、文档自动生成.
 - **安全攻防落地**：SQL 注入、XSS、CSRF、DDoS 防护、敏感数据脱敏、数据加密 AES/RSA
 - **权限体系**：RBAC 权限模型、接口黑白名单、接口鉴权链路设计,[sa-token](https://github.com/dromara/sa-token) [springsecuity](https://github.com/spring-projects/spring-security)
-
-## 数据库文档
-
-### 一、数据库模型设计原则（库表字段本身）
-
-**1. 命名规范原则**
-
-1. 表名、字段名**下划线命名**，全部小写，禁止驼峰、中文。
-2. 表名按模块前缀区分：`sys_`系统，`biz_`业务，避免不同业务表混在一起。
-3. 禁止使用 MySQL 关键字做字段名（如 `order`、`desc`）。
-4. 主键统一 `id`；通用字段名字保持统一：`create_time`、`update_time`、`create_by`、`update_by`、`is_deleted`。
-
-**2. 范式与反范式平衡**
-
-- 三范式：减少冗余，避免数据重复更新异常；
-- **允许适度反范式**：频繁关联查询的场景，适当冗余字段，减少 JOIN，换取查询性能。
-
-> 不要盲目严格第三范式，业务优先。
-
-**3. 字段类型选择原则**
-
-1. 时间：使用 `datetime`，**禁止 varchar 存时间**；
-2. 状态、标志位：用 `tinyint`，不用字符串；
-3. 手机号、账号、编码用 `varchar`，不要数字类型；
-4. 长文本使用 `text`，普通短字符串合理设置长度，不要全部 varchar (255)；
-5. 主键用 `bigint`，数据量大避免 int 溢出；
-6. 非空约束：能 NOT NULL 尽量 NOT NULL，设置合理默认值，减少 null 带来的查询坑。
-
-**4. 删除策略：优先逻辑删除**
-
-- 使用 `is_deleted tinyint 0未删除 1已删除`，**业务代码实现删除，少用物理删除**；
-- 重要数据保留，方便排查、恢复；
-
-> 注意：所有查询必须带上 `is_deleted=0`。
-
-**5. 外键原则：业务层维护关联，数据库少用物理外键**
-
-- 物理外键会影响性能、锁、迁移；
-- **关联关系由应用程序代码保证**，文档中注明外键逻辑关系，数据库不建立物理外键约束。
-
-**6. 索引设计原则**
-
-1. where、join、order by、group by 的字段考虑建索引；
-2. 索引不是越多越好，索引会降低插入更新性能；
-3. 区分普通索引、唯一索引；联合索引遵循最左前缀；
-4. 低基数字段（性别、状态）不建索引。
-
-**7. 字符集与存储引擎**
-
-- 统一引擎 InnoDB；字符集 `utf8mb4`，支持 emoji，不要用 utf8。
-
-**8. 扩展性原则**
-
-1. 预留扩展字段，如 `ext_json` json 字段存不确定的扩展属性；
-2. 避免频繁修改表结构；大版本变更记录 DDL 脚本。
-
-### 二、数据库**文档书写原则**（写文档，重点，考试 / 面试常考）
-
-1. **业务易懂原则**：每张表必须写清楚业务含义；每个字段必须写注释，不能靠名字猜含义。
-2. **枚举字典显性化**：状态、类型等数字枚举，文档中明确列出全部值含义，不要藏在代码里。
-3. **体现关系**：提供 ER 图，写清表之间一对多、多对多逻辑关系；多对多必须中间表。
-4. **索引完整记录**：文档写明每一个索引：索引名、字段、类型、建立原因。
-5. **公共字段统一说明**：把 create_time、is_deleted 等公共字段统一说明，每张表不用重复解释。
-6. **可追溯原则**：文档要有变更记录，记录每一次表结构改动、改动原因。
-7. **和接口对齐**：数据库字段与后端实体、API 接口字段含义保持一致；数据库下划线 ↔ Java 驼峰。
-8. **区分逻辑与物理**：文档写**逻辑外键关系**，同时注明数据库没有物理外键约束。
-9. 不写模糊描述，例如 “状态：1 代表有效”，要完整全部枚举：`0禁用，1正常，2冻结`。
-10. **每张表写清楚业务含义；**
-11. **每个字段：类型、非空、默认值、注释；枚举全部列出来；**
-12. **单独写索引，哪些字段建索引，为什么；**
-13. **区分逻辑删除还是物理删除；**
-14. **ER 图画出一对多关系（用户 1 对多订单）；**
-15. **公共字段统一一套（create_time、is_deleted）。**
 
 # 框架
 
@@ -769,214 +694,15 @@ TS
 - 主键策略、自动填充、逻辑删除、乐观锁
 - 代码生成器、分页插件、多租户插件
 
-#### 1.基础
-
-**1. 快速上手**
-
-- Spring Boot 整合 MyBatis-Plus（引入 Starter、配置文件）
-
-- ```
-  BaseMapper<T>
-  ```
-
-  ：内置的 CRUD 方法
-
-  - `insert`、`deleteById`、`updateById`、`selectById`、`selectList`
-  - `selectBatchIds`、`deleteBatchIds`
-
-- ```
-  IService<T>
-  ```
-
-  ```
-  ServiceImpl<M, T>
-  ```
-
-  ：Service 层 CRUD
-
-  - `save`、`remove`、`update`、`getById`、`list`、`page`
-
-**2. 条件构造器**（最常用，必须熟练）
-
-- ```
-  QueryWrapper
-  ```
-
-  ：查询条件
-
-  - `eq`、`ne`、`gt`、`ge`、`lt`、`le`（等于、不等于、大于、小于...）
-  - `like`、`notLike`、`likeLeft`、`likeRight`
-  - `in`、`notIn`、`between`
-  - `orderByAsc`、`orderByDesc`
-  - `select`（指定查询字段）
-  - `and`、`or`（条件拼接）
-
-- ```
-  UpdateWrapper
-  ```
-
-  ：更新条件
-
-  - `set`（设置更新字段）
-
-- Lambda 版本
-
-  （推荐，避免字段名写错）：
-
-  - `LambdaQueryWrapper`、`LambdaUpdateWrapper`
-  - `Wrappers.<User>lambdaQuery()` 快捷创建
-
-**3. 分页插件**
-
-- 分页配置类（`MybatisPlusInterceptor` + `PaginationInnerInterceptor`）
-- `Page<T>` 对象使用
-- `page(page, wrapper)` 分页查询
-- 分页结果：`records`、`total`、`current`、`size`
-
-**4. 常用注解**
-
-- `@TableName`：指定表名
-- `@TableId`：主键 + 主键策略（ASSIGN_ID 雪花算法、AUTO 自增）
-- `@TableField`：字段映射、`exist = false`（非数据库字段）
-- `@TableLogic`：逻辑删除
-
-**5. 代码生成器**
-
-- MyBatis-Plus Generator 或 CodeGenerator
-- 一键生成 Entity、Mapper、Service、Controller
-- 自定义模板（生成 VO、DTO、Query 等）
-
-#### 2. 核心原理
-
-- MyBatis-Plus 启动流程：如何自动注入 BaseMapper 方法
-- Mapper 代理原理：JDK 动态代理 + MapperProxy
-- SQL 注入原理：SqlInjector、AbstractMethod
-- **动手实践**：自定义 BaseMapper 方法（比如批量插入 MySQL 专属方法）
-
-#### 3. 条件构造器进阶
-
-- QueryWrapper / UpdateWrapper / LambdaQueryWrapper / LambdaUpdateWrapper 区别
-- 条件构造器的链式调用原理
-- 自定义 SQL 条件：`apply`、`inSql`、`exists`
-- 逻辑删除：全局配置、自定义删除值、联表查询注意事项
-- 自动填充：`MetaObjectHandler`、创建时间/更新时间/创建人/更新人
-- 乐观锁：`@Version` 注解、乐观锁插件、适用场景
-- 多租户：TenantLineInnerInterceptor、租户隔离原理
-- 动态表名：DynamicTableNameInnerInterceptor
-
-#### 4. 分页插件
-
-- 分页原理：Mybatis Plus 拦截器（InnerInterceptor）
-- 物理分页 vs 逻辑分页
-- 分页查询优化：count 查询优化、大页码优化
-- **动手实践**：实现一个通用分页工具类，支持排序、条件查询
-
-#### 5. 代码生成器
-
-- MyBatis-Plus Generator 使用
-- 自定义代码模板：Controller、Service、Mapper、Entity、VO、DTO
-- 一键生成 CRUD 代码
-
-#### 6. 高级映射
-
-- 一对一、一对多、多对多关联查询
-- `@TableName`、`@TableField`、`@TableId` 注解详解
-- 字段类型处理器：TypeHandler、枚举处理器、JSON 处理器
-- 主键策略：ASSIGN_ID（雪花算法）、AUTO、INPUT、UUID
-
-#### **7. 自定义 SQL**
-
-- 在 Mapper.xml 中写复杂 SQL
-- `@Select`、`@Update` 注解写 SQL
-- 条件构造器 + 自定义 XML 结合使用
-
-#### 8.进阶了解（源码级理解）
-
-- MyBatis-Plus 启动流程与注入原理
-- `BaseMapper` 方法如何自动生成 SQL（SqlInjector）
-- 拦截器链原理（InnerInterceptor）
-- 分页插件源码分析
-- 扩展自定义通用方法（比如自定义批量插入）
-
-## 4. SSM 整合
-
-- 整合思路：Spring 整合 MyBatis（SqlSessionFactoryBean、MapperScannerConfigurer）
-- Spring 整合 SpringMVC、父子容器关系
-- 事务配置、全注解式开发、配置类拆分
-
 ## 5. Spring Boot
 
 - 核心原理：起步依赖、自动配置原理（@SpringBootApplication、SPI 机制、条件注解）
 - 配置管理：application.yml/properties、多环境配置、配置绑定 @ConfigurationProperties
+- yml书写格式
 - 常用 Starter：Web、Validation、Redis、RabbitMQ、MyBatis-Plus
 - 内嵌服务器、打包部署（jar/war）
 - 监控与运维：Actuator 端点、Spring Boot Admin
 - 异常处理、拦截器、跨域配置的最佳实践
-
-#### 1. 自动配置原理（面试必问）
-
-- `@SpringBootApplication` 注解拆解
-  - `@SpringBootConfiguration` → `@Configuration`
-  - `@EnableAutoConfiguration` → 自动配置核心
-  - `@ComponentScan` → 包扫描
-- SPI 机制：`spring.factories` 文件作用
-- 条件注解：`@ConditionalOnClass`、`@ConditionalOnMissingBean`、`@ConditionalOnProperty`
-- 自动配置流程：Spring Boot 启动时如何加载自动配置类
-- **动手实践**：自己手写一个 Starter（比如 `my-spring-boot-starter`）
-- Spring Boot 启动流程（完整 7 步）
-- 监听器与事件机制（ApplicationListener、ApplicationEvent）
-- Spring Boot Admin 监控面板
-
-#### 2. Spring Boot 启动流程
-
-- 启动流程：创建 SpringApplication → 运行 run 方法 → 准备环境 → 创建上下文 → 刷新上下文 → 启动完成
-- 监听器机制：ApplicationListener、SpringApplicationRunListener
-- 启动过程中如何扩展：CommandLineRunner、ApplicationRunner
-
-#### 3. 配置文件管理读取
-
-- 配置文件优先级：命令行 > 环境变量 > application.yml > application.properties
-- 多环境配置：`application-dev.yml`、`application-prod.yml`、如何切换
-- 配置绑定：`@ConfigurationProperties`、`@Value`、`@PropertySource`
-- 配置元数据：`additional-spring-configuration-metadata.json`
-- 类型安全的配置属性
-
-#### 4. Web 开发
-
-- Spring MVC 自动配置：DispatcherServlet、ViewResolver、消息转换器
-- 拦截器 vs 过滤器：区别、执行顺序、适用场景
-- 全局异常处理：`@RestControllerAdvice` + `@ExceptionHandler`
-- 统一返回格式：Result 封装、全局响应体处理
-- 参数校验：`@Valid` + `@NotBlank` + `@Length` + 自定义校验注解
-- 日期处理：`@DateTimeFormat`、`@JsonFormat`、全局日期格式化
-- 文件上传下载：MultipartFile、大文件分片上传
-- 跨域配置：`@CrossOrigin`、全局 CORS 配置、网关层跨域
-
-#### 5. 事务管理
-
-- `@Transactional` 事务原理：AOP 动态代理
-- 事务传播行为：7 种传播机制，重点掌握 REQUIRED、REQUIRES_NEW、NESTED
-- 事务隔离级别：读未提交、读已提交、可重复读、串行化
-- **事务失效的 10 种场景**（重点）：
-  1. 方法不是 public 的
-  2. 自调用问题（同类中方法调用）
-  3. 异常类型不对（默认只回滚 RuntimeException）
-  4. 捕获了异常没抛出
-  5. 数据库引擎不支持事务（MyISAM）
-  6. 多线程下事务不生效
-  7. 没有被 Spring 管理
-  8. 传播行为设置错了
-  9. 大事务问题
-  10. 嵌套事务踩坑
-- 编程式事务：TransactionTemplate
-
-### 6.场景导入
-
-Redis 
-
-knf4ij
-
-
 
 ## 6. Spring AI
 
@@ -985,190 +711,11 @@ knf4ij
 - 高级特性：函数调用、多模态输入、流式输出
 - 场景落地：智能问答、内容生成、结构化数据提取
 
-### 大模型 API 接入
-
-### 一、必须掌握（核心基础，开发天天用）
-
-#### 1. Spring AI 核心概念与模型接入
-
-- **Spring AI 是什么**：Spring 生态的 AI 开发框架，统一各种大模型 API
-
-- **核心抽象**：`ChatModel`（聊天模型）、`Prompt`（提示词）、`ChatResponse`（响应）
-
-- 接入主流大模型
-
-  （国内推荐优先学）：
-
-  - 通义千问（阿里云）
-  - 豆包（字节火山）
-  - DeepSeek
-  - OpenAI（国外）
-
-- 依赖引入 + 配置文件（API Key、模型名称、Base URL）
-
-- 最简单的调用：`chatModel.call("你好")` 一句话调用
-
-#### 2. Prompt 模板与结构化提示
-
-- `PromptTemplate` 提示词模板
-
-  ：动态填充变量
-
-  Java
-
-  ```java
-  PromptTemplate template = new PromptTemplate("你是一个{role}，请回答：{question}");
-  Prompt prompt = template.create(Map.of("role", "Java 专家", "question", "什么是多线程"));
-  ```
-
-- **System Prompt**：设定 AI 人设、角色、输出规范
-- **消息列表**：`SystemMessage` + `UserMessage` + `AssistantMessage` 构造多轮对话
-- **提示词设计基础**：清晰指令、角色设定、示例引导（Few-shot）
-
-#### 3. 输出解析
-
-- **`BeanOutputConverter`**：把 AI 返回的 JSON 转成 Java 对象
-- **`ListOutputConverter`**、`MapOutputConverter` 等常用解析器
-- 结构化输出：让 AI 按指定格式返回数据（比如 JSON、列表）
-
-#### 4. 流式输出（SSE）
-
-- 为什么需要流式：提升用户体验，不用等全部生成完
-- `chatModel.stream()` 流式 API
-- **SSE（Server-Sent Events）**：后端向前端流式推送
-- 前端配合：`EventSource` 或 `fetch + ReadableStream`
-- 流式响应的异常处理
-
-#### 5. 对话记忆（多轮对话）
-
-- **`ChatMemory`**：对话记忆接口
-- **`MessageChatMemory`**：内存版对话历史
-- 记忆管理：保留最近 N 条、Token 限制、对话清空
-- 多用户对话隔离（按用户 ID 存不同的 ChatMemory）
-
-------
-
-### 二、建议掌握（做项目必备）
-
-#### 6. Embedding 与向量检索
-
-- **`EmbeddingModel`**：文本向量化模型接口
-
-- 接入 Embedding 模型：通义 embedding、BGE、M3E
-
-- 向量相似度计算（余弦相似度）
-
-- 向量数据库集成
-
-  ：
-
-  - Redis Vector（简单方便）
-  - Milvus（专业、高性能）
-  - Chroma / Pinecone（了解）
-
-- 基本操作：向量写入、相似度查询、Top-K 召回
-
-#### 7. RAG 检索增强生成
-
-- RAG 完整流程：文档加载 → 文本分块 → 向量化 → 存储 → 检索 → 生成
-
-- 文档加载器
-
-  ：
-
-  - PDF 解析（Apache PDFBox、Tika）
-  - Word 解析（Apache POI）
-  - Markdown / TXT 解析
-
-- **文本分块**：固定大小分块、按标题分块
-
-- **检索 + 生成**：把召回的上下文拼到 Prompt 里，让大模型基于文档回答
-
-- **引用溯源**：返回答案引用了哪些文档片段
-
-#### 8. 多模态能力
-
-- 图片理解
-
-  ：多模态模型调用（qwen-vl、gpt-4o）
-
-  - 图片输入方式：URL、Base64
-  - 应用：图片描述、OCR、图表分析
-
-- 图片生成
-
-  ：调用文生图 API（通义万相、DALL·E）
-
-  - 提示词工程（图片生成的提示词技巧）
-  - 图片保存与返回
-
-#### 9. 函数调用 / 工具调用（Function Calling）
-
-- 什么是 Function Calling：让 AI 调用你写的 Java 方法
-- Spring AI 函数调用方式：
-  - `@Description` 注解定义工具函数
-  - 函数注册到 ChatModel
-  - 函数调用流程：AI 决定调用 → 执行函数 → 结果返回给 AI → AI 生成最终答案
-- 实用工具例子：
-  - 查询数据库（查订单、查用户信息）
-  - 调用外部 API（查天气、查快递）
-  - 计算器、时间工具
-
-#### 10. Token 计数与成本控制
-
-- Token 计费原理：输入 + 输出都收费
-- 成本估算：不同模型的价格对比
-- 成本优化手段：
-  - 选合适的模型（简单问题用便宜模型）
-  - 控制上下文长度（摘要压缩历史对话）
-  - 缓存常用问答
-
-------
-
-### 三、进阶了解（高级玩法 / 面试加分）
-
-#### 11. AI Agent 开发
-
-- Agent 核心组成：大模型 + 工具调用 + 记忆 + 规划
-- ReAct 模式（推理 + 行动）
-- Spring AI Agent 模块
-- 多 Agent 协作：多个 AI 分工合作
-- 任务规划（Task Planner）
-
-#### 12. RAG 高级优化
-
-- **重排序（Rerank）**：用 Rerank 模型对召回结果二次排序
-- **混合检索**：关键词检索（BM25）+ 向量检索融合
-- **查询改写**：用大模型改写用户问题，提升召回率
-- **多轮对话 RAG**：历史对话 + 查询重构
-- 知识库增量更新、版本管理
-- RAG 效果评估（召回率、准确率）
-
-#### 13. 模型路由与降级
-
-- 多模型管理：根据任务难度选择不同模型
-- 故障降级：一个模型挂了自动切另一个
-- 负载均衡：多个 API Key 轮询使用
-
-#### 14. 安全与合规
-
-- 输入校验：防止 Prompt 注入攻击
-- 输出审核：敏感词过滤、内容安全
-- 数据隐私：敏感数据不上传大模型
-- 调用日志与审计
-
-#### 15. 高级特性
-
-- **结构化输出**：JSON Schema 约束输出格式
-- **图像生成高级**：批量生成、风格控制
-- **语音能力**：TTS 语音合成、ASR 语音识别
-- **视频生成**：异步任务处理、状态轮询
-
 ## 项目规范
 
 **完整链路请求：**  SpringBoot 接收请求 → 参数校验 → 登录鉴权 (JWT) →会话管理 → 业务逻辑 → 调用数据库 → 返回结果，全局异常处理→ 返回前端渲染
 
-#### 1. 分层架构
+### 1. 分层架构
 
 - 标准分层：Controller → Service → Mapper → Entity
 - 扩展分层：
@@ -1179,21 +726,21 @@ knf4ij
   - Convert：对象转换工具
 - **为什么需要分层？** 解耦、易维护、可复用、安全（不暴露数据库字段）
 
-#### 2. 工具类与规范
+### 2. 工具类与规范
 
 - **Lombok**：`@Data`、`@NoArgsConstructor`、`@AllArgsConstructor`、`@Builder`、`@Slf4j`
 - **Hutool**：字符串、日期、文件、加密、验证码等工具
 - **MapStruct**：实体转换，替代 BeanUtils（高性能，编译期生成代码）
 - **Hutool 工具类使用练习**：至少掌握 20 个常用工具方法
 
-#### 3. 异常处理规范
+### 3. 异常处理规范
 
 - 自定义业务异常：`BusinessException`
 - 错误码枚举：`ErrorCodeEnum`（统一管理错误码）
 - 全局异常捕获：分类处理业务异常、参数校验异常、系统异常
 - 异常日志规范：什么级别打什么日志
 
-#### 4. 日志规范
+### 4. 日志规范
 
 - SLF4J + Logback 配置
 - 日志级别：TRACE、DEBUG、INFO、WARN、ERROR
@@ -1205,19 +752,19 @@ knf4ij
 
 ## 一、安全权限框架（核心：Spring Security）
 
-安全权限框架（核心：Spring Security）
-
-Spring Security（企业首选认证授权框架）
+Spring Security（企业首选认证授权框架）认证 授权 防护
 
 Sa‑Token
 
-### 接口文档 Knife4j / SpringDoc（3 天）
+OAuth2.0/ OpenID‑Connect
 
-- Knife4j 配置与使用
-- 常用注解：`@Api`、`@ApiOperation`、`@ApiModel`、`@ApiModelProperty`
-- JWT 调试配置
-- 离线文档导出
-- SpringDoc OpenAPI3（Spring Boot 3 推荐）
+| 平台              | 个人能否申请  | 是否收费 | 说明                                                         |
+| ----------------- | ------------- | -------- | ------------------------------------------------------------ |
+| **Gitee（码云）** | ✅个人可以     | 🆓免费    | 国内，访问快，无需审核，直接创建 OAuth 应用，拿到`client_id/client_secret`，适合国内个人项目。 |
+| **QQ 互联**       | ✅个人实名认证 | 🆓免费    | 需要简单审核，国内用户基数大；注意：回调地址要配置正确，修改后需要等待生效。 |
+| **微博登录**      | ✅个人可以     | 🆓免费    | 个人开发者可以创建应用，需要简单审核。                       |
+| **百度账号登录**  | ✅个人可以     | 🆓免费    | 百度开放平台，个人账号可接入。                               |
+| **GitHub**        | ✅个人可以     | 🆓免费    | 海外，无需审核；国内访问速度一般，适合技术类网站、博客。     |
 
 ## 二、工具 & 通用集成框架
 
@@ -1337,20 +884,9 @@ JVM 进程内高性能缓存，搭配 Redis 二级缓存，减轻中间件压力
 1. Spring Mail：项目邮件发送（告警、验证码）
 2. 阿里云 / 腾讯云 SMS SDK：短信验证码、通知
 3. 微信开放平台 SDK：小程序、公众号登录推送
+4. OSS
 
-## 十三、第三方登录
-
-OAuth2.0/ OpenID‑Connect
-
-| 平台              | 个人能否申请  | 是否收费 | 说明                                                         |
-| ----------------- | ------------- | -------- | ------------------------------------------------------------ |
-| **Gitee（码云）** | ✅个人可以     | 🆓免费    | 国内，访问快，无需审核，直接创建 OAuth 应用，拿到`client_id/client_secret`，适合国内个人项目。 |
-| **QQ 互联**       | ✅个人实名认证 | 🆓免费    | 需要简单审核，国内用户基数大；注意：回调地址要配置正确，修改后需要等待生效。 |
-| **微博登录**      | ✅个人可以     | 🆓免费    | 个人开发者可以创建应用，需要简单审核。                       |
-| **百度账号登录**  | ✅个人可以     | 🆓免费    | 百度开放平台，个人账号可接入。                               |
-| **GitHub**        | ✅个人可以     | 🆓免费    | 海外，无需审核；国内访问速度一般，适合技术类网站、博客。     |
-
-# 微服务理论
+# 微服务
 
 **1）接入层（流量入口）**
 
@@ -1435,36 +971,44 @@ OAuth2.0/ OpenID‑Connect
    - 服务注册发现：服务提供者 / 消费者接入、服务心跳、健康检查
    - 动态配置中心：配置管理、命名空间 / 分组 / DataId、配置热更新、灰度发布
    - 集群部署、数据持久化、AP+CP 模式切换
+   - 集注册中心 + 配置中心于一体，服务注册发现、动态配置管理
 2. Sentinel
    - 流量控制：QPS / 线程数限流、流控模式（直接 / 关联 / 链路）、冷启动 / 匀速排队
    - 熔断降级：慢调用比例、异常比例、异常数策略
    - 热点参数限流、系统自适应保护、授权规则
    - 持久化规则、与 Feign/Gateway 整合
+   - 流量控制组件，做服务限流、熔断降级、系统自适应保护
 3. Dubbo
    - RPC 架构：服务提供者 / 消费者、注册中心、监控中心
    - 调用流程、负载均衡策略、集群容错机制
    - 序列化方式、超时与重试、服务分组与版本
+   - 高性能 RPC 调用框架，实现微服务之间远程方法调用
 4. RocketMQ
    - 核心架构：NameServer/Broker/Producer/Consumer
    - 消息发送：同步 / 异步 / 单向、批量消息、顺序消息、延迟消息
    - 消息消费：集群 / 广播模式、消息重试、死信队列
    - 事务消息、消息幂等性、消息可靠性保证
+   - 阿里消息中间件，提供异步解耦、削峰填谷的消息队列能力
 5. Seata
    - 分布式事务理论：CAP、BASE、柔性事务
    - 四大模式：AT（自动补偿）、TCC、SAGA、XA 模式对比与适用场景
    - AT 模式落地：TC/TM/RM 角色、一阶段提交 / 二阶段回滚、undo_log
    - 常见问题：脏写、悬挂、空回滚
+   - 分布式事务组件，解决微服务跨库跨服务的数据一致性问题
 6. Alibaba Cloud OSS
    - 对象存储 SDK 集成、服务端签名直传、图片处理
    - 权限控制、生命周期管理、跨域配置
+   - 对象存储，用于文件上传下载云端存储
 7. Alibaba Cloud SchedulerX
    - 分布式定时任务、Cron 表达式、任务分片
    - 失败重试、任务监控、工作流编排
+   - 分布式任务调度，定时任务分布式执行
 8. Spring Cloud Gateway
    - 核心概念：路由、断言、过滤器
    - 路由配置：路径断言、参数 / 请求头断言、动态路由
    - 过滤器：局部 / 全局过滤器、鉴权、日志、限流、跨域处理
    - 集成 Sentinel 网关限流、集成 Nacos 服务发现
+   - （网关，属于 SpringCloud，SCAlibaba 适配）：API 网关，请求路由、鉴权过滤、流量转发。
 
 **补充微服务核心知识**
 
@@ -1565,69 +1109,6 @@ CanCommit→PreCommit→DoCommit，解决部分阻塞；依然有一致性问题
 
 # AI应用
 
-## 1. Agent 开发与使用
-
-- 核心组成：大模型大脑 + 规划能力 + 工具调用 + 记忆模块
-- 典型框架：LangChain / LlamaIndex / Spring AI Agent
-- 核心能力：多轮对话、工具调用（API / 数据库 / 搜索引擎）、任务拆解、自主规划
-- 落地场景：智能客服、代码助手、数据分析 Agent、工作流自动化
-- 什么是 Agent：大模型 + 工具调用 + 记忆 + 规划
-- Agent 的核心能力：
-  - 工具调用（Function Calling）
-  - 任务规划（Planning）
-  - 记忆（Memory）
-  - 反思（Reflection）
-- **函数调用**什么是 Function Calling：让大模型调用你提供的工具Spring AI 函数调用：`@Description` 注解定义工具工具注册与调用流程**动手实践**：给 AI 加几个工具（查天气、查数据库、调用计算器）
-- 多 Agent 协作：多个 Agent 分工合作
-
-## 2. AIGC 多模态生成
-
-- 文本生成：文案写作、摘要提取、代码生成、结构化输出
-- 图片生成：Stable Diffusion / 文心一格 / DALL・E 调用、参数调优
-- 视频生成：文字生成视频、数字人播报、视频脚本生成
-- 音频生成：语音合成（TTS）、语音识别（ASR）、声音克隆
-- 工程落地：API 调用封装、流式响应、内容审核、成本优化
-
-## 3. 向量数据库
-
-- 核心概念：向量嵌入（Embedding）、相似度检索、向量索引
-- 主流产品：Milvus、Pinecone、Chroma、Redis Vector
-- 核心操作：向量写入、相似度查询、元数据过滤、索引构建
-- 应用场景：语义检索、推荐系统、图像检索、RAG 知识库
-
-## 4. RAG 检索增强生成
-
-- 完整流程：文档加载 → 文本分块 → 向量化 → 向量存储 → 检索召回 → 大模型生成
-- 关键优化：分块策略、召回率优化、重排序（Rerank）、多轮对话上下文
-- 工程落地：知识库管理、增量更新、引用溯源、问答效果评估
-- 常见框架：LangChain RAG、LlamaIndex、Spring AI RAG 实现
-
-## 5. 大模型运作原理
-
-- 数据处理流程：原始文本 → 清洗 → 分词（Tokenizer）→ 词表构建
-- 表示层：词嵌入（Embedding）、位置编码、语义向量空间
-- 核心架构：Transformer 结构、自注意力机制（Self-Attention）、多头注意力
-- 训练过程：预训练（语言建模）→ 监督微调（SFT）→ 人类反馈强化学习（RLHF）
-- 推理过程：输入编码 → 注意力计算 → 逐词生成 → 概率采样
-- 核心概念：上下文窗口、幻觉、温度系数、Top-P/Top-K 采样
-
-## 6.RAG智能客服实战平台
-
-做一个完整的 AI 应用项目，包含以下功能：
-
-- [ ] 智能对话：流式对话、多轮对话、对话历史
-- [ ] 图片生成：文生图、图片保存、我的作品
-- [ ] 图片理解：上传图片提问
-- [ ] 视频生成：文生视频、异步任务、状态查询
-- [ ] 知识库问答：
-  - [ ] 文档上传（PDF/Word/Markdown）
-  - [ ] 文档解析与向量化
-  - [ ] 语义检索问答
-  - [ ] 引用溯源
-- [ ] 我的助手：创建自定义 AI 助手（设定人设、提示词）
-- [ ] 用户系统：注册登录、积分/额度管理
-- [ ] 管理后台：用户管理、模型配置、知识库管理
-
 # 面经
 
 ## 核心
@@ -1696,177 +1177,7 @@ CanCommit→PreCommit→DoCommit，解决部分阻塞；依然有一致性问题
 
 ## 计算机基础
 
-**1. 计算机组成原理**
-
-1. CPU：寄存器、ALU、缓存 L1/L2/L3、缓存行、缓存失效、伪共享
-2. 内存：虚拟内存、分页、页表、缺页中断、交换分区
-3. IO 模型：阻塞 IO、非阻塞 IO、IO 多路复用 (select/poll/epoll)、异步 IO、Java NIO 底层对应关系
-4. 存储层级：寄存器 > 高速缓存 > 内存 > 磁盘 > 网络，速度差距与程序优化思路
-
-**2. 计算机网络**
-
-1. TCP 详解：三次握手、四次挥手、滑动窗口、拥塞控制、超时重传、粘包拆包、Nagle 算法
-2. UDP：适用场景，和 TCP 对比
-3. HTTP1.1 / HTTP2 / HTTP3 区别：多路复用、头部压缩、QUIC
-4. HTTPS 完整流程：TLS 握手、非对称加密 + 对称加密、CA 证书、中间人攻击
-5. DNS 递归 / 迭代查询、CDN 原理
-6. Socket 编程：TCP 服务端 / 客户端简易实现
-7. 网络安全：XSS、CSRF、SQL 注入、DDOS 攻击防护
-8. 网络模型：OSI 七层、TCP/IP 四层；各层作用与代表协议
-9. TCP vs UDP：核心差异、优缺点、适用场景
-10. TCP 可靠性：三次握手、四次挥手、序列号、确认应答、超时重传
-11. TCP 拥塞控制：慢启动、拥塞避免、快重传、快恢复
-12. HTTP/HTTPS：区别、HTTPS 加密流程（对称 + 非对称 + 数字证书）
-13. HTTP 基础：常见状态码、请求方法、请求头 / 响应头作用
-14. DNS 解析：从域名到 IP 的完整解析流程
-
-**3. 操作系统（面试高频）**
-
-1. 进程、线程、协程三者本质区别、切换开销
-2. 进程调度算法、内存管理（分页 / 分段）
-3. 文件系统：inode、块、软硬链接
-4. Linux 高频命令：网络 (netstat/ss/tcpdump)、磁盘 (df/du)、进程 (top/htop)、日志 (grep/tail)
-5. 信号、孤儿进程、僵尸进程
-6. 用户态 / 内核态切换原理
-7. 进程 vs 线程：定义、资源分配、调度、开销的本质区别
-8. 进程通信（IPC）：管道、消息队列、共享内存、信号量、Socket
-9. 线程同步互斥：互斥锁、信号量、条件变量、读写锁
-10. 死锁：4 个必要条件；死锁的预防、避免、检测与解除
-11. 延伸：协程的概念，与线程的差异；上下文切换的开销
-
-**4. 缓存**
-
-- 核心思想：空间换时间，降低下游负载
-- 淘汰策略：LRU、LFU、FIFO、随机淘汰；**手写 LRU 缓存（哈希表 + 双向链表）**
-- 三大缓存问题：穿透、击穿、雪崩；各自成因与解决方案
-- 更新策略：Cache Aside、Write Through、Write Back 的区别与适用场景
-
 ## JVM
-
-**1. 运行时数据区（内存模型）**
-
-1. 五大区域：**程序计数器、虚拟机栈、本地方法栈、堆、元空间 Metaspace**
-2. 线程私有 / 线程共享区分
-   - 私有：程序计数器、虚拟机栈、本地方法栈
-   - 共享：堆、元空间
-3. 每个区域作用、会抛出什么异常
-   - 程序计数器：**唯一没有 OOM 的区域**，记录字节码执行行号
-   - 虚拟机栈：存放栈帧；递归过深抛出 `StackOverflowError`；线程过多会 OOM
-   - 堆：对象实例，GC 主战场，分年轻代、老年代
-   - 元空间：存储类信息、常量、静态变量；使用本地内存，替代 JDK8 之前永久代 PermGen
-4. 栈帧组成：局部变量表、操作数栈、动态链接、方法返回地址
-5. Java 对象内存布局：**对象头 (MarkWord、类型指针)、实例数据、对齐填充**
-6. MarkWord 内容：hashCode、分代年龄、锁状态标记
-7. 逃逸分析、栈上分配、标量替换：优化，对象分配到栈减少 GC
-
-**2. 垃圾回收 GC**
-
-**2.1 判断对象死亡**
-
-1. 引用计数法：原理、**循环引用缺陷**，JVM 不用
-2. 可达性分析（JVM 使用）
-   - GC‑Roots 有哪些
-   - 从 GC Roots 向下搜索，不可到达即为垃圾
-3. 四种引用
-   - 强引用、软引用 SoftReference（缓存）、弱引用 WeakReference（WeakHashMap）、虚引用 PhantomReference（堆外内存回收通知）
-
-**2.2 堆分代模型**
-
-1. 年轻代 Eden : S0 : S1 = 8:1:1，为什么需要两块 Survivor
-2. 对象晋升老年代条件
-   - 存活年龄达到 15
-   - Survivor 放不下，分配担保
-   - 大对象直接进入老年代
-3. Minor GC / Major GC / Full GC 概念、触发条件、区别
-4. 空间分配担保机制
-
-**2.3 GC 算法**
-
-- 标记‑清除：简单，产生内存碎片
-- 标记‑复制：无碎片，需要预留内存
-- 标记‑整理：无碎片，移动对象，STW 时间长
-
-**2.4 垃圾收集器（高频）**
-
-表格
-
-| 收集器         | 特点                                              |
-| -------------- | ------------------------------------------------- |
-| Serial         | 单线程，全部 STW，客户端                          |
-| Parallel GC    | 多线程，**吞吐量优先，JDK8 默认**                 |
-| CMS            | 并发标记清除，低停顿；碎片多、浮动垃圾；JDK8 废弃 |
-| G1 (JDK9 默认) | Region 分块，可预测停顿；Humongous 大对象区       |
-| ZGC(JDK11+)    | 染色指针，几乎零 STW，支持 TB 级堆                |
-
-1. CMS 四个阶段：初始标记 (STW)、并发标记、重新标记 (STW)、并发清除；浮动垃圾产生原因、CMS 缺点
-2. G1 Region、Humongous 大对象
-3. ZGC 染色指针、读屏障，为什么停顿极低
-4. **STW Stop‑The‑World**：含义，哪些阶段会发生 STW
-
-**3. 类加载机制**
-
-1. 类加载 5 个阶段：
-
-   加载 → 验证 → 准备 → 解析 → 初始化
-
-   ，每个阶段做什么
-
-   - 准备：静态变量赋**默认零值**
-   - 初始化：执行静态代码块，赋值程序员写的值
-
-2. 类加载器
-
-   - Bootstrap、Extension、AppClassLoader、自定义类加载器
-
-3. 双亲委派模型
-
-   - 原理、好处
-   - 破坏双亲委派的场景：Tomcat、SPI、自定义 ClassLoader
-
-4. 类的初始化时机，什么时候会触发类加载
-
-**4. JVM 参数**
-
-1. 堆：`‑Xms`初始堆，`‑Xmx`最大堆；生产建议 Xms=Xmx
-2. `‑Xmn`年轻代大小
-3. 元空间：`‑XX:MetaspaceSize`、`‑XX:MaxMetaspaceSize`
-4. OOM 自动 dump：`‑XX:+HeapDumpOnOutOfMemoryError`
-5. GC 日志打印参数
-6. 大对象阈值：`‑XX:PretenureSizeThreshold`
-
-**5. OOM 各种场景（高频故障题）**
-
-1. `Java heap space`：堆内存溢出，内存泄漏 / 对象过多
-2. `Metaspace`：动态生成大量类
-3. `Direct buffer memory`：堆外内存溢出 NIO
-4. `Unable to create new native thread`：创建线程太多
-
-> 区分：**内存泄漏 VS 内存溢出**
-
-- 内存泄漏：无用对象仍持有引用，GC 无法回收，日积月累最终 OOM
-
-**6. JVM 排查工具 & 线上故障（必问）**
-
-**工具命令**
-
-- jps：查看 Java 进程
-- jstat ‑gc：实时查看 GC 统计
-- jmap ‑dump：dump 堆快照
-- jstack：打印线程栈，排查死锁、死循环、阻塞
-
-> 可视化：MAT 内存分析工具；线上神器 Arthas
-
-**故障排查流程**
-
-1. CPU 飙高排查步骤
-   1. top 拿到进程 pid
-   2. top‑H 找到高消耗线程 tid
-   3. tid 转 16 进制，jstack 输出栈定位代码
-2. 频繁 FullGC 排查思路
-   - jstat 看 GC 指标；dump 堆快照 MAT 分析
-   - 可能原因：内存泄漏、对象快速晋升老年代、元空间满、人为调用 System.gc
-3. OOM 故障复盘思路
-4. 内存抖动：大量临时对象，频繁 MinorGC
 
 ## 并发
 
@@ -1882,7 +1193,7 @@ CanCommit→PreCommit→DoCommit，解决部分阻塞；依然有一致性问题
 4. **瓶颈分析**：性能瓶颈、单点故障、扩展性瓶颈
 5. **优化方案**：缓存、异步、分片、扩容、降级
 
-### 2.2 必掌握的核心系统设计题
+### 必掌握的核心系统设计题
 
 | 题目                 | 核心考察点                                                  |
 | -------------------- | ----------------------------------------------------------- |
@@ -1977,19 +1288,37 @@ CanCommit→PreCommit→DoCommit，解决部分阻塞；依然有一致性问题
 - 工作期限是怎么样的?
 - 工作生活怎么平衡?
 
-# 脚本语言
+# 额外学习内容
 
-## python
+## 脚本语言
 
-## javascripts
+### python
 
-## Groovy
+### javascripts
+
+### Shell
+
+### .ps1
+
+### Lua
+
+### Groovy
 
 | 技术 / 组件 | 一句话作用                                                   | 典型场景                                                     |
 | ----------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | Groovy      | 运行在 JVM 上的动态脚本语言，兼容 Java 语法，可无缝调用 Java 类，语法简洁，支持静态 / 动态双模式，可编译为 class 字节码 | Gradle 构建脚本、Maven/Groovy 单元测试、DSL 脚本、快速原型、Jenkins Pipeline 脚本 |
 
-# 额外学习内容
+## 声明式编程
+
+- **命令式 (Imperative)**：**怎么做**。详细告诉计算机每一步步骤、流程，控制循环、判断。（强调过程）
+- **声明式 (Declarative)**：**要什么**。只描述**想要的结果**，不写具体执行步骤，底层框架 / 引擎帮你实现过程。（强调结果）
+
+| 技术      | 声明式写法说明                                               |
+| --------- | ------------------------------------------------------------ |
+| SQL       | `select name from user where age>18`，只说明查什么，数据库引擎决定怎么扫描索引（最经典声明式！） |
+| HTML      | `<div><p>hello</p></div>`，描述页面长什么样；浏览器负责渲染，不用写绘图步骤 |
+| Vue 模板  | `<div v‑for="item in list">{{item}}</div>`，声明循环渲染，不用手动操作 DOM |
+| React JSX | 声明 UI 应该是什么状态，框架负责更新 DOM                     |
 
 ## JAVAFX
 
@@ -2020,17 +1349,6 @@ CanCommit→PreCommit→DoCommit，解决部分阻塞；依然有一致性问题
 Git‑GitLab + WebHook + Jenkins Pipeline + Maven + SonarQube + 静态漏洞分析 + Docker + Harbor + K8s 部署
 
 ## java函数式编程
-
-## springcloudalibaba
-
-1. **Nacos**：集注册中心 + 配置中心于一体，服务注册发现、动态配置管理。
-2. **Sentinel**：流量控制组件，做服务限流、熔断降级、系统自适应保护。
-3. **Dubbo**：高性能 RPC 调用框架，实现微服务之间远程方法调用。
-4. **RocketMQ**：阿里消息中间件，提供异步解耦、削峰填谷的消息队列能力。
-5. **Seata**：分布式事务组件，解决微服务跨库跨服务的数据一致性问题。
-6. **Alibaba Cloud OSS**：对象存储，用于文件上传下载云端存储。
-7. **Alibaba Cloud SchedulerX**：分布式任务调度，定时任务分布式执行。
-8. **Spring Cloud Gateway**（网关，属于 SpringCloud，SCAlibaba 适配）：API 网关，请求路由、鉴权过滤、流量转发。
 
 ## Kubernetes
 
@@ -2098,13 +1416,7 @@ Git‑GitLab + WebHook + Jenkins Pipeline + Maven + SonarQube + 静态漏洞分�
 
 黑马程序员 spring高级原理
 
-## 系统优化
-
-## 系统架构
-
-![image-20260816160547726](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20260816160547726.png)
-
-## 计算机如何工作的
+## 计算机原理
 
 ![image-20260816160421772](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20260816160421772.png)
 
@@ -2149,8 +1461,6 @@ DFA
 - [线性规划](#线性规划linear-programming视频)
 - [几何：凸包（Geometry, Convex hull）](#几何凸包geometry-convex-hull视频)
 - [离散数学](#离散数学)
-
-## 框架
 
 ## 中间件
 
