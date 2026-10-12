@@ -1222,6 +1222,88 @@ data class ChatConfig(
 5. 空值：写 `password:` 后面留空，不要写 `password: null`
 6. yml 中`off / on、yes / no`会自动转布尔，字符串 "yes" 要加引号 `"yes"`
 
+### 常见配置
+
+**SQL初始化**
+
+```
+sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
+      data-locations: classpath:db/data.sql
+      continue-on-error: false
+```
+
+| 配置                                        | 含义                                                         |
+| ------------------------------------------- | ------------------------------------------------------------ |
+| `spring.sql.init.mode: always`              | 每次启动都执行脚本。可选值：`embedded`（默认，仅内嵌库如 H2 才执行）、`always`（总是执行）、`never`（不执行）。这里用`always`是因为我们用的是外部 MySQL。 |
+| `schema-locations: classpath:db/schema.sql` | 建表脚本位置 → `src/main/resources/db/schema.sql`（三张表的 `CREATE TABLE`） |
+| `data-locations: classpath:db/data.sql`     | 初始化数据脚本位置 → `src/main/resources/db/data.sql`（管理员账号、示例商品） |
+| `continue-on-error: false`                  | 脚本执行出错就终止启动（快速失败）。改成 `true` 则忽略错误继续启动。 |
+
+**MyBatisPlus**
+
+```
+mybatis-plus:
+  configuration:
+    # 控制台打印 SQL，方便学习观察
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+```
+
+log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+指定 SQL 日志实现方式，把执行的 SQL 和参数直接打印到控制台
+
+org.apache.ibatis.logging.slf4j.Slf4jImpl — 交给日志框架（推荐生产用，可配合 logging.level 控制）
+org.apache.ibatis.logging.nologging.NoLoggingImpl — 不打印
+
+global-config.db-config（MyBatis-Plus 约定）
+id-type: auto
+全局主键策略 = 数据库自增。这样实体里就不用每个都写 @TableId(type = IdType.AUTO)。
+
+IdType 其他常用值：
+
+值	说明
+AUTO	数据库自增（本项目）
+ASSIGN_ID	MP 生成雪花算法 Long/String（默认策略，适合分库分表）
+ASSIGN_UUID	生成 UUID 字符串
+INPUT	由调用方自己 setId
+
+
+
+逻辑删除三兄弟
+
+```
+logic-delete-field: deleted   # 逻辑删除字段名
+logic-delete-value: 1         # 已删除的值
+logic-not-delete-value: 0     # 未删除的值
+
+```
+
+
+
+**JDBC配置**
+
+```
+datasource:
+  driver-class-name: com.mysql.cj.jdbc.Driver
+  # createDatabaseIfNotExist=true：数据库不存在时自动创建 bike_shop
+  url: jdbc:mysql://127.0.0.1:3306/bike_shop?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+  username: root
+  password: '412826'
+```
+
+
+
+
+
 ##  Profiles 多环境切换
 
 > **Profile 作用：一套代码，不同环境加载不同配置** 开发环境：本地调试、开启 h2 控制台、关闭 thymeleaf 缓存、日志打全； 生产环境：连接真实数据库、关闭调试功能、关闭控制台、日志精简。

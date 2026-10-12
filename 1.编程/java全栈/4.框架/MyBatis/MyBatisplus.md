@@ -134,7 +134,7 @@ mybatis-plus:
 
 # 入门案例
 
-### 1开发环境
+## 1开发环境
 
 \- Java 17
 
@@ -723,7 +723,65 @@ SELECT * FROM users WHERE age > ?
 Parameters: 20(Integer)
 ```
 
+## duid连接池
+
+# 核心原理
+
+## MyBatis-Plus 启动流程：如何自动注入 BaseMapper 方法
+
+## Mapper 代理原理：JDK 动态代理 + MapperProxy
+
+## SQL 注入原理：SqlInjector、AbstractMethod
+
+## 动手实践：自定义 BaseMapper 方法（比如批量插入 MySQL 专属方法）
+
+## 条件构造器（最常用，必须熟练）
+
+一句话：**用来用 Java 代码动态拼接 SQL 的 `WHERE` 条件，不用手写 XML SQL 字符串，自动生成 SQL**
+
+- ```
+  QueryWrapper
+  ```
+
+  ：查询条件
+
+  - `eq`、`ne`、`gt`、`ge`、`lt`、`le`（等于、不等于、大于、小于...）
+  - `like`、`notLike`、`likeLeft`、`likeRight`
+  - `in`、`notIn`、`between`
+  - `orderByAsc`、`orderByDesc`
+  - `select`（指定查询字段）
+  - `and`、`or`（条件拼接）
+
+- ```
+  UpdateWrapper
+  ```
+
+  ：更新条件
+
+  - `set`（设置更新字段）
+
+- Lambda 版本
+
+  （推荐，避免字段名写错）：
+
+  - `LambdaQueryWrapper`、`LambdaUpdateWrapper`
+  - `Wrappers.<User>lambdaQuery()` 快捷创建
+
+  - QueryWrapper / UpdateWrapper / LambdaQueryWrapper / LambdaUpdateWrapper 区别
+  - 条件构造器的链式调用原理
+  - 自定义 SQL 条件：`apply`、`inSql`、`exists`
+  - 逻辑删除：全局配置、自定义删除值、联表查询注意事项
+  - 自动填充：`MetaObjectHandler`、创建时间/更新时间/创建人/更新人
+  - 乐观锁：`@Version` 注解、乐观锁插件、适用场景
+  - 多租户：TenantLineInnerInterceptor、租户隔离原理
+  - 动态表名：DynamicTableNameInnerInterceptor
+
 # 常用注解
+
+- `@TableName`：指定表名
+- `@TableId`：主键 + 主键策略（ASSIGN_ID 雪花算法、AUTO 自增）
+- `@TableField`：字段映射、`exist = false`（非数据库字段）
+- `@TableLogic`：逻辑删除
 
 ## @TableName
 
@@ -1009,6 +1067,11 @@ queryWrapper.exists("SELECT 1 FROM role WHERE user.id=role.user_id");
 
 ## 分页插件
 
+- 分页原理：Mybatis Plus 拦截器（InnerInterceptor）
+- 物理分页 vs 逻辑分页
+- 分页查询优化：count 查询优化、大页码优化
+- **动手实践**：实现一个通用分页工具类，支持排序、条件查询
+
 MyBatis Plus自带分页插件，只要简单的配置即可实现分页功能
 
 ```
@@ -1036,6 +1099,10 @@ public class MybatisPlusConfig {
 # 通用枚举
 
 # 代码生成器
+
+- MyBatis-Plus Generator 使用
+- 自定义代码模板：Controller、Service、Mapper、Entity、VO、DTO
+- 一键生成 CRUD 代码
 
 ## 引入依赖
 
@@ -1242,4 +1309,22 @@ implements ProductService {
 2、如果我们实现读写分离，将写操作方法加上主库数据源，读操作方法加上从库数据源，自动切
 换，是不是就能实现读写分离
 
+# **自定义 SQL**
+
+- 在 Mapper.xml 中写复杂 SQL
+- `@Select`、`@Update` 注解写 SQL
+- 条件构造器 + 自定义 XML 结合使用
+
+# 进阶了解（源码级理解）
+
+- MyBatis-Plus 启动流程与注入原理
+- `BaseMapper` 方法如何自动生成 SQL（SqlInjector）
+- 拦截器链原理（InnerInterceptor）
+- 分页插件源码分析
+- 扩展自定义通用方法（比如自定义批量插入）
+
 # 项目实战
+
+## Spring-MyBatisPlus
+
+## SpringBoot-MyBatiPlus
